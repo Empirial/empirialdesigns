@@ -1,0 +1,13 @@
+project_id = "vfysnkkzesbovtnmoccb"
+
+[functions.github-repo-contents]
+verify_jwt = true
+
+[functions.github-commit]
+verify_jwt = true
+
+[functions.manage-repo]
+verify_jwt = true
+
+[functions.ai-chat]
+verify_jwt = true

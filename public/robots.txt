@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://empirialdesigns.netlify.app/sitemap.xml

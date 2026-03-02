@@ -1,0 +1,10 @@
+
+data: {"id":"gen-1762117596-elfGIHGpPkikxsZL7OJD","provider":"Nebius","model":"deepseek/deepseek-r1-0528","object":"chat.completion.chunk","created":1762117596,"choices":[{"index":0,"delta":{"role":"assistant","content":"x\nimport Hero from '@/components/Hero';\nimport PricingSection from '@/components/PricingSection';\nimport Services","reasoning":null,"reasoning_details":[]},"finish_reason":null,"native_finish_reason":null,"logprobs":null}]}
+
+data: {"id":"gen-1762117596-elfGIHGpPkikxsZL7OJD","provider":"Nebius","model":"deepseek/deepseek-r1-0528","object":"chat.completion.chunk","created":1762117596,"choices":[{"index":0,"delta":{"role":"assistant","content":"Section from '@/components/ServicesSection';\nimport TestimonialsSection from '@/components/TestimonialsSection';\nimport Contact","reasoning":null,"reasoning_details":[]},"finish_reason":null,"native_finish_reason":null,"logprobs":null}]}
+
+data: {"id":"gen-1762117596-elfGIHGpPkikxsZL7OJD","provider":"Nebius","model":"deepseek/deepseek-r1-0528","object":"chat.completion.chunk","created":1762117596,"choices":[{"index":0,"delta":{"role":"assistant","content":"Section from '@/components/ContactSection';\nimport Footer from '@/components/Footer';\n\nconst Index = () => {\n  return (\n    <div","reasoning":null,"reasoning_details":[]},"finish_reason":null,"native_finish_reason":null,"logprobs":null}]}
+
+data: {"id":"gen-1762117596-elfGIHGpPkikxsZL7OJD","provider":"Nebius","model":"deepseek/deepseek-r1-0528","object":"chat.completion.chunk","created":1762117596,"choices":[{"index":0,"delta":{"role":"assistant","content":" className=\"bg-black text-white\">\n      <Hero />\n      <ServicesSection />\n      <PricingSection />\n      ","reasoning":null,"reasoning_details":[]},"finish_reason":null,"native_finish_reason":null,"logprobs":null}]}
+
+data: {"id":"gen-1762117596-elfGIHGpPkikxsZL7OJD","provider":"Nebius","model":"deepseek/deepseek-r1-0528","object":"chat.completion.chunk","created":1762117596,"choices":[{"index":0,"delta":{"role":"assistant","content":"<TestimonialsSection />\n      <ContactSection />\n      <Footer />\n    </div>\n  );\n};\n\nexport default Index;\n
