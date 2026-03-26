@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { supabase } from '@/integrations/supabase/client';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from '@/integrations/firebase/config';
 import { useToast } from '@/hooks/use-toast';
 import { Send, FileCode, GitCommit, Loader2, File, X, Menu, Target, Crosshair, Eye } from 'lucide-react';
-import type { User } from '@supabase/supabase-js';
+import type { User } from 'firebase/auth';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -40,9 +43,9 @@ interface Message {
 
 interface Repo {
   id: string;
-  repo_owner: string;
-  repo_name: string;
-  github_token: string | null;
+  repoOwner: string;
+  repoName: string;
+  githubToken: string | null;
 }
 
 interface FileItem {
@@ -77,22 +80,20 @@ const ChatInterface = () => {
     createConversation,
     saveMessage,
     deleteConversation,
-  } = useConversations(user?.id, repo?.id);
+  } = useConversations(user?.uid, repo?.id);
 
   // Fetch repository files
   const fetchRepoFiles = async (repoData: Repo) => {
     setLoadingFiles(true);
     try {
-      const { data, error } = await supabase.functions.invoke('github-repo-contents', {
-        body: {
-          owner: repoData.repo_owner,
-          repo: repoData.repo_name,
-          path: '',
-        },
+      const getRepoContents = httpsCallable(functions, 'githubRepoContents');
+      const result = await getRepoContents({
+        owner: repoData.repoOwner,
+        repo: repoData.repoName,
+        path: '',
       });
 
-      if (error) throw error;
-
+      const data = result.data as any[];
       if (Array.isArray(data)) {
         const files = data
           .filter((item: any) => item.type === 'file' || item.type === 'dir')
@@ -117,38 +118,30 @@ const ChatInterface = () => {
   };
 
   useEffect(() => {
-    // Check authentication and load repo
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        
-        // Fetch user's repository
-        const { data: repoData, error } = await supabase
-          .from('user_repos')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (!error && repoData) {
-          setRepo(repoData);
-          fetchRepoFiles(repoData);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+
+        // Fetch user's most recent repository
+        try {
+          const reposRef = collection(db, 'users', firebaseUser.uid, 'repos');
+          const q = query(reposRef, orderBy('createdAt', 'desc'));
+          const snapshot = await getDocs(q);
+          if (!snapshot.empty) {
+            const repoDoc = snapshot.docs[0];
+            const repoData = { id: repoDoc.id, ...repoDoc.data() } as Repo;
+            setRepo(repoData);
+            fetchRepoFiles(repoData);
+          }
+        } catch (error: any) {
+          console.error('Failed to load repo:', error);
         }
       } else {
         navigate('/auth');
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-      } else {
-        navigate('/auth');
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, [navigate]);
 
   useEffect(() => {
@@ -163,10 +156,10 @@ const ChatInterface = () => {
     if (user && conversations.length === 0 && !currentConversationId) {
       createConversation();
     }
-  }, [user, conversations, currentConversationId]);
+  }, [user, conversations, currentConversationId, createConversation]);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
     toast({
       title: "Signed out",
       description: "You've been successfully signed out.",
@@ -184,34 +177,34 @@ const ChatInterface = () => {
     const classes = Array.from(element.classList);
     const id = element.id || undefined;
     const text = element.textContent?.slice(0, 50) || undefined;
-    
+
     let component = element.getAttribute('data-component');
     if (!component) {
-      const componentClasses = classes.find(c => 
-        c.includes('Hero') || c.includes('Navigation') || c.includes('Footer') || 
+      const componentClasses = classes.find(c =>
+        c.includes('Hero') || c.includes('Navigation') || c.includes('Footer') ||
         c.includes('Sidebar') || c.includes('Contact') || c.includes('About') ||
         c.includes('Services') || c.includes('Portfolio') || c.includes('Testimonials') ||
         c.includes('Pricing') || c.includes('FAQ') || c.includes('Blog') || c.includes('CTA')
       );
       component = componentClasses;
     }
-    
+
     return { tag, classes, id, text, component };
   }, []);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!inspectorActive) return;
-    
+
     const elements = document.elementsFromPoint(e.clientX, e.clientY);
-    const targetElement = elements.find(el => 
-      !el.closest('.visual-inspector-overlay') && 
+    const targetElement = elements.find(el =>
+      !el.closest('.visual-inspector-overlay') &&
       !el.closest('.visual-inspector-controls')
     ) as HTMLElement;
-    
+
     if (!targetElement || targetElement === hoveredElement) return;
-    
+
     setHoveredElement(targetElement);
-    
+
     const rect = targetElement.getBoundingClientRect();
     setHighlightStyle({
       position: 'fixed',
@@ -226,22 +219,22 @@ const ChatInterface = () => {
 
   const handleInspectorClick = useCallback((e: MouseEvent) => {
     if (!inspectorActive || !hoveredElement) return;
-    
+
     e.preventDefault();
     e.stopPropagation();
-    
+
     const elementInfo = getElementInfo(hoveredElement);
     let description = '';
-    
+
     if (elementInfo.component) {
       description = elementInfo.component;
     } else if (elementInfo.id) {
       description = `#${elementInfo.id}`;
     } else if (elementInfo.classes.length > 0) {
-      const meaningfulClasses = elementInfo.classes.filter(c => 
-        !c.startsWith('text-') && 
-        !c.startsWith('bg-') && 
-        !c.startsWith('p-') && 
+      const meaningfulClasses = elementInfo.classes.filter(c =>
+        !c.startsWith('text-') &&
+        !c.startsWith('bg-') &&
+        !c.startsWith('p-') &&
         !c.startsWith('m-') &&
         !c.startsWith('w-') &&
         !c.startsWith('h-') &&
@@ -252,11 +245,11 @@ const ChatInterface = () => {
     } else {
       description = `${elementInfo.tag} element`;
     }
-    
+
     if (elementInfo.text) {
       description += ` ("${elementInfo.text}")`;
     }
-    
+
     setSelectedComponent(description);
     setInspectorActive(false);
     toast({
@@ -273,7 +266,7 @@ const ChatInterface = () => {
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('click', handleInspectorClick, true);
-    
+
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('click', handleInspectorClick, true);
@@ -294,14 +287,14 @@ const ChatInterface = () => {
     // Build context message if files or component are selected
     let contextMessage = input;
     const contextParts: string[] = [];
-    
+
     if (selectedFiles.length > 0) {
       contextParts.push(`Files to edit: ${selectedFiles.join(', ')}`);
     }
     if (selectedComponent) {
       contextParts.push(`Component/Section to edit: ${selectedComponent}`);
     }
-    
+
     if (contextParts.length > 0) {
       contextMessage = `Context: ${contextParts.join(' | ')}\n\nRequest: ${input}`;
     }
@@ -323,23 +316,22 @@ const ChatInterface = () => {
     await saveMessage(userMessage);
 
     try {
-      const CHAT_URL = `https://vfysnkkzesbovtnmoccb.supabase.co/functions/v1/ai-chat`;
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
-      if (!accessToken) {
+      const FUNCTIONS_URL = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL;
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
         throw new Error('Not authenticated');
       }
 
-      const response = await fetch(CHAT_URL, {
+      const response = await fetch(`${FUNCTIONS_URL}/aiChat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           messages: [...messages.map(m => ({ role: m.role, content: m.content })).filter(m => m.role !== 'assistant' || m.content), { role: 'user', content: contextMessage }],
-          repoOwner: repo?.repo_owner,
-          repoName: repo?.repo_name,
+          repoOwner: repo?.repoOwner,
+          repoName: repo?.repoName,
           repoId: repo?.id,
           selectedFiles: selectedFiles.length > 0 ? selectedFiles : undefined,
         }),
@@ -376,7 +368,7 @@ const ChatInterface = () => {
       while (!streamDone) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         textBuffer += decoder.decode(value, { stream: true });
 
         let newlineIndex: number;
@@ -396,7 +388,7 @@ const ChatInterface = () => {
 
           try {
             const parsed = JSON.parse(jsonStr);
-            
+
             // Handle tool calls
             if (parsed.type === 'tool_call') {
               const toolCall: ToolCall = {
@@ -407,24 +399,24 @@ const ChatInterface = () => {
                 output: parsed.output,
               };
               toolCalls.push(toolCall);
-              setMessages(prev => prev.map(m => 
+              setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, toolCalls: [...(m.toolCalls || []), toolCall] } : m
               ));
             }
-            
+
             // Handle commit URL
             if (parsed.type === 'commit') {
               commitUrl = parsed.url;
-              setMessages(prev => prev.map(m => 
+              setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, commitUrl } : m
               ));
             }
-            
+
             // Handle regular content
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) {
               assistantContent += content;
-              setMessages(prev => prev.map(m => 
+              setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, content: assistantContent } : m
               ));
             }
@@ -472,18 +464,18 @@ const ChatInterface = () => {
       {/* Visual Inspector Overlay */}
       {inspectorActive && (
         <>
-          <div 
+          <div
             className="fixed inset-0 bg-primary/5 backdrop-blur-[1px] z-[9998]"
             style={{ pointerEvents: 'none' }}
           />
-          
+
           {hoveredElement && (
             <div
               style={highlightStyle}
               className="border-2 border-primary bg-primary/10 z-[9999] rounded"
             />
           )}
-          
+
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000] flex items-center gap-3 bg-background border-2 border-primary rounded-full px-6 py-3 shadow-2xl">
             <Eye className="h-5 w-5 text-primary animate-pulse" />
             <span className="text-sm font-medium">Click any element to select it</span>
@@ -525,7 +517,7 @@ const ChatInterface = () => {
                 <h1 className="text-xl font-bold text-gradient">Empirial AI Assistant</h1>
                 {repo && (
                   <p className="text-xs text-muted-foreground">
-                    Connected to: {repo.repo_owner}/{repo.repo_name}
+                    Connected to: {repo.repoOwner}/{repo.repoName}
                   </p>
                 )}
               </div>
@@ -541,8 +533,8 @@ const ChatInterface = () => {
                     Welcome to Empirial AI
                   </h2>
                   <p className="text-muted-foreground">
-                    {repo 
-                      ? "I'm ready to help with your repository!" 
+                    {repo
+                      ? "I'm ready to help with your repository!"
                       : "Please connect a repository to get started."}
                   </p>
                 </div>
@@ -577,7 +569,7 @@ const ChatInterface = () => {
                               ))}
                             </div>
                           )}
-                          
+
                           {/* Message content with markdown */}
                           <div className="prose prose-sm dark:prose-invert max-w-none">
                             <ReactMarkdown
@@ -608,7 +600,7 @@ const ChatInterface = () => {
                           {/* Commit link */}
                           {message.commitUrl && (
                             <div className="pt-4 border-t border-border/50">
-                              <a 
+                              <a
                                 href={message.commitUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -668,7 +660,7 @@ const ChatInterface = () => {
                   )}
                 </div>
               )}
-              
+
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -709,7 +701,7 @@ const ChatInterface = () => {
                             <DropdownMenuItem
                               key={file.path}
                               onClick={() => {
-                                setSelectedFiles(prev => 
+                                setSelectedFiles(prev =>
                                   prev.includes(file.path)
                                     ? prev.filter(f => f !== file.path)
                                     : [...prev, file.path]
@@ -797,10 +789,10 @@ const ChatInterface = () => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={
-                    selectedComponent 
-                      ? `Editing ${selectedComponent}...` 
-                      : selectedFiles.length > 0 
-                        ? `Editing ${selectedFiles.length} file(s)...` 
+                    selectedComponent
+                      ? `Editing ${selectedComponent}...`
+                      : selectedFiles.length > 0
+                        ? `Editing ${selectedFiles.length} file(s)...`
                         : "Type your message..."
                   }
                   className="flex-1 h-12 rounded-full"

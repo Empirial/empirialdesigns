@@ -3,7 +3,7 @@ import ServiceCard from './services/ServiceCard';
 
 const NewServices = () => {
   const openWhatsApp = () => {
-    window.open('https://wa.me/message/6ZHJUVYQDOH3O1', '_blank');
+    window.open('https://wa.me/27606691849', '_blank');
   };
 
   const services = [
@@ -61,7 +61,7 @@ const NewServices = () => {
         "1 Weeks Delivery"
       ],
       addons: "Add-ons: Advanced shipping (R1,500), Multi-currency (R1,000), Product reviews (R800)",
-      cta: "This Way"
+      cta: "Get Started"
     }
   ];
 

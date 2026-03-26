@@ -3,15 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { supabase } from '@/integrations/supabase/client';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from '@/integrations/firebase/config';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  Send, 
-  LogOut, 
-  RefreshCw, 
-  ExternalLink, 
-  ArrowLeft, 
-  Crosshair, 
+import {
+  Send,
+  LogOut,
+  RefreshCw,
+  ExternalLink,
+  ArrowLeft,
+  Crosshair,
   FolderOpen,
   X,
   FileCode,
@@ -27,9 +30,7 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import type { User } from '@supabase/supabase-js';
-
-const SUPABASE_URL = "https://vfysnkkzesbovtnmoccb.supabase.co";
+import type { User } from 'firebase/auth';
 
 interface Message {
   id: string;
@@ -41,11 +42,11 @@ interface Message {
 
 interface Repo {
   id: string;
-  repo_owner: string;
-  repo_name: string;
-  repo_url: string;
-  deploy_url?: string;
-  github_token?: string;
+  repoOwner: string;
+  repoName: string;
+  repoUrl: string;
+  deployUrl?: string;
+  githubToken?: string;
 }
 
 interface FileItem {
@@ -59,7 +60,7 @@ const Preview = () => {
   const { repoId } = useParams<{ repoId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   // Core state
   const [user, setUser] = useState<User | null>(null);
   const [repo, setRepo] = useState<Repo | null>(null);
@@ -82,35 +83,22 @@ const Preview = () => {
 
   // Auth and repo loading
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        loadRepo(session.user.id);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        loadRepo(firebaseUser.uid);
       } else {
         navigate('/auth');
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-      } else {
-        navigate('/auth');
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, [navigate, repoId]);
 
   const loadRepo = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('user_repos')
-      .select('*')
-      .eq('id', repoId)
-      .eq('user_id', userId)
-      .single();
-
-    if (error || !data) {
+    if (!repoId) return;
+    const repoDoc = await getDoc(doc(db, 'users', userId, 'repos', repoId));
+    if (!repoDoc.exists()) {
       toast({
         title: "Error",
         description: "Repository not found",
@@ -120,7 +108,7 @@ const Preview = () => {
       return;
     }
 
-    setRepo(data);
+    setRepo({ id: repoDoc.id, ...repoDoc.data() } as Repo);
   };
 
   // Load files when repo is available
@@ -131,38 +119,21 @@ const Preview = () => {
   }, [repo, filesLoaded]);
 
   const loadFiles = async () => {
-    if (!repo?.github_token) {
-      console.log('No GitHub token available');
-      return;
-    }
+    if (!repo) return;
 
     setLoadingFiles(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/github-repo-contents`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          owner: repo.repo_owner,
-          repo: repo.repo_name,
-          token: repo.github_token,
-          path: '',
-        }),
+      const getRepoContents = httpsCallable(functions, 'githubRepoContents');
+      const result = await getRepoContents({
+        owner: repo.repoOwner,
+        repo: repo.repoName,
+        path: '',
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to load files');
-      }
+      const data = result.data as any[];
 
-      const data = await response.json();
-      
       // Transform GitHub API response to FileItem format
-      const transformedFiles: FileItem[] = Array.isArray(data) 
+      const transformedFiles: FileItem[] = Array.isArray(data)
         ? data.map((item: any) => ({
             name: item.name,
             path: item.path,
@@ -180,7 +151,7 @@ const Preview = () => {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
     navigate('/');
   };
 
@@ -198,7 +169,7 @@ const Preview = () => {
     const classes = Array.from(element.classList).slice(0, 3).join('.');
     const id = element.id ? `#${element.id}` : '';
     const textContent = element.textContent?.slice(0, 30)?.trim() || '';
-    
+
     // Try to infer component name from data attributes or class patterns
     let componentName = '';
     if (element.dataset.component) {
@@ -229,18 +200,18 @@ const Preview = () => {
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!inspectorActive) return;
-    
+
     const iframe = document.querySelector('iframe');
     if (!iframe) return;
 
     const iframeRect = iframe.getBoundingClientRect();
-    
+
     // Check if mouse is over the overlay area (which covers the iframe)
     const overlayElement = document.querySelector('[data-inspector-overlay]');
     if (!overlayElement) return;
-    
+
     const overlayRect = overlayElement.getBoundingClientRect();
-    
+
     if (
       e.clientX >= overlayRect.left &&
       e.clientX <= overlayRect.right &&
@@ -250,7 +221,7 @@ const Preview = () => {
       // Calculate position relative to iframe
       const relX = e.clientX - iframeRect.left;
       const relY = e.clientY - iframeRect.top;
-      
+
       // Create a highlight box at cursor position (simulated)
       setHighlightStyle({
         position: 'absolute',
@@ -269,10 +240,10 @@ const Preview = () => {
 
   const handleInspectorClick = useCallback((e: MouseEvent) => {
     if (!inspectorActive) return;
-    
+
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Since we can't access iframe content directly due to cross-origin,
     // we capture the click position and create a description
     const iframe = document.querySelector('iframe');
@@ -281,24 +252,24 @@ const Preview = () => {
     const iframeRect = iframe.getBoundingClientRect();
     const relX = e.clientX - iframeRect.left;
     const relY = e.clientY - iframeRect.top;
-    
+
     // Calculate percentage position for better description
     const xPercent = Math.round((relX / iframeRect.width) * 100);
     const yPercent = Math.round((relY / iframeRect.height) * 100);
-    
+
     let location = '';
     if (yPercent < 15) location = 'header/navigation area';
     else if (yPercent > 85) location = 'footer area';
     else if (xPercent < 25) location = 'left sidebar area';
     else if (xPercent > 75) location = 'right sidebar area';
     else location = 'main content area';
-    
+
     const description = `Element at ${location} (${xPercent}% from left, ${yPercent}% from top)`;
-    
+
     setSelectedComponent(description);
     setInspectorActive(false);
     setHighlightStyle({});
-    
+
     toast({
       title: "Element selected",
       description: description,
@@ -310,7 +281,7 @@ const Preview = () => {
     if (inspectorActive) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('click', handleInspectorClick, true);
-      
+
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('click', handleInspectorClick, true);
@@ -338,7 +309,7 @@ const Preview = () => {
   }, [inspectorActive]);
 
   const toggleFileSelection = (filePath: string) => {
-    setSelectedFiles(prev => 
+    setSelectedFiles(prev =>
       prev.includes(filePath)
         ? prev.filter(f => f !== filePath)
         : [...prev, filePath]
@@ -385,26 +356,25 @@ const Preview = () => {
     setSelectedComponent('');
 
     try {
-      const CHAT_URL = `${SUPABASE_URL}/functions/v1/ai-chat`;
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
-      if (!accessToken) {
+      const FUNCTIONS_URL = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL;
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
         throw new Error('Not authenticated');
       }
 
-      const response = await fetch(CHAT_URL, {
+      const response = await fetch(`${FUNCTIONS_URL}/aiChat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           messages: [
-            ...messages.map(m => ({ role: m.role, content: m.content })), 
+            ...messages.map(m => ({ role: m.role, content: m.content })),
             { role: 'user', content: fullMessage } // Send with context
           ],
-          repoOwner: repo.repo_owner,
-          repoName: repo.repo_name,
+          repoOwner: repo.repoOwner,
+          repoName: repo.repoName,
           repoId: repo.id,
           selectedFiles: selectedFiles.length > 0 ? selectedFiles : undefined,
         }),
@@ -446,7 +416,7 @@ const Preview = () => {
       while (!streamDone) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         textBuffer += decoder.decode(value, { stream: true });
 
         let newlineIndex: number;
@@ -469,11 +439,11 @@ const Preview = () => {
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) {
               assistantContent += content;
-              setMessages(prev => prev.map(m => 
+              setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, content: assistantContent } : m
               ));
             }
-            
+
             if (parsed.commit_url) {
               commitUrl = parsed.commit_url;
             }
@@ -485,10 +455,10 @@ const Preview = () => {
       }
 
       if (commitUrl) {
-        setMessages(prev => prev.map(m => 
+        setMessages(prev => prev.map(m =>
           m.id === assistantId ? { ...m, commitUrl } : m
         ));
-        
+
         setTimeout(() => refreshPreview(), 2000);
       }
 
@@ -508,7 +478,7 @@ const Preview = () => {
     return null;
   }
 
-  const previewUrl = repo.deploy_url || `https://${repo.repo_name}.netlify.app`;
+  const previewUrl = repo.deployUrl || `https://${repo.repoName}.netlify.app`;
   const hasSelections = selectedFiles.length > 0 || selectedComponent;
 
   return (
@@ -534,8 +504,8 @@ const Preview = () => {
             </Button>
           </div>
           <div>
-            <h2 className="font-bold text-lg truncate">{repo.repo_name}</h2>
-            <p className="text-sm text-muted-foreground truncate">{repo.repo_owner}</p>
+            <h2 className="font-bold text-lg truncate">{repo.repoName}</h2>
+            <p className="text-sm text-muted-foreground truncate">{repo.repoOwner}</p>
           </div>
         </div>
 
@@ -777,17 +747,17 @@ const Preview = () => {
             className="w-full h-full border-0"
             title="Site Preview"
           />
-          
+
           {/* Inspector Overlay */}
           {inspectorActive && (
-            <div 
+            <div
               data-inspector-overlay
               className="absolute inset-0 cursor-crosshair"
               style={{ backgroundColor: 'rgba(0,0,0,0.05)' }}
             >
               {/* Highlight Box */}
               <div style={highlightStyle} />
-              
+
               {/* Instructions Tooltip */}
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background border border-border rounded-lg px-4 py-2 shadow-lg">
                 <p className="text-sm text-muted-foreground">

@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 interface Conversation {
   id: string;
   title: string;
-  updated_at: string;
+  updatedAt: string;
 }
 
 interface AppSidebarProps {

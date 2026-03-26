@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  collection, query, orderBy, onSnapshot, addDoc,
+  updateDoc, deleteDoc, doc, getDocs, serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '@/integrations/firebase/config';
 import { useToast } from '@/hooks/use-toast';
 
 interface Conversation {
   id: string;
   title: string;
-  updated_at: string;
-  repo_id?: string;
+  updatedAt: string;
+  repoId?: string;
 }
 
 interface Message {
@@ -25,182 +29,125 @@ export const useConversations = (userId: string | undefined, repoId: string | un
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  // Load conversations
+  // Real-time conversations listener
   useEffect(() => {
     if (!userId) return;
 
-    const loadConversations = async () => {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('user_id', userId)
-        .order('updated_at', { ascending: false });
+    const convsRef = collection(db, 'users', userId, 'conversations');
+    const q = query(convsRef, orderBy('updatedAt', 'desc'));
 
-      if (error) {
-        console.error('Error loading conversations:', error);
-        return;
-      }
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const convs: Conversation[] = snapshot.docs.map((d) => ({
+        id: d.id,
+        title: d.data().title || 'New Conversation',
+        updatedAt: d.data().updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        repoId: d.data().repoId,
+      }));
+      setConversations(convs);
+    }, (error) => {
+      console.error('Error loading conversations:', error);
+    });
 
-      setConversations(data || []);
-    };
-
-    loadConversations();
-
-    // Subscribe to real-time updates
-    const channel = supabase
-      .channel('conversations-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'conversations',
-          filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          loadConversations();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => unsubscribe();
   }, [userId]);
 
   // Load messages for current conversation
   useEffect(() => {
-    if (!currentConversationId) return;
+    if (!currentConversationId || !userId) return;
 
     const loadMessages = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('conversation_id', currentConversationId)
-        .order('created_at', { ascending: true });
+      try {
+        const msgsRef = collection(db, 'users', userId, 'conversations', currentConversationId, 'messages');
+        const q = query(msgsRef, orderBy('createdAt', 'asc'));
+        const snapshot = await getDocs(q);
 
-      if (error) {
-        console.error('Error loading messages:', error);
-        toast({
-          title: "Error loading messages",
-          description: error.message,
-          variant: "destructive",
-        });
+        setMessages(
+          snapshot.docs.map((d) => ({
+            id: d.id,
+            role: d.data().role as 'user' | 'assistant',
+            content: d.data().content,
+            timestamp: d.data().createdAt?.toDate?.() || new Date(),
+            toolCalls: d.data().toolCalls || undefined,
+            commitUrl: d.data().commitUrl || undefined,
+          }))
+        );
+      } catch (error: any) {
+        toast({ title: 'Error loading messages', description: error.message, variant: 'destructive' });
+      } finally {
         setLoading(false);
-        return;
       }
-
-      setMessages(
-        data.map((msg) => ({
-          id: msg.id,
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content,
-          timestamp: new Date(msg.created_at),
-          toolCalls: msg.tool_calls ? (Array.isArray(msg.tool_calls) ? msg.tool_calls : []) : undefined,
-          commitUrl: msg.commit_url || undefined,
-        }))
-      );
-      setLoading(false);
     };
 
     loadMessages();
-  }, [currentConversationId, toast]);
+  }, [currentConversationId, userId, toast]);
 
-  // Create new conversation
-  const createConversation = async () => {
+  const createConversation = useCallback(async () => {
     if (!userId) return null;
 
-    const { data, error } = await supabase
-      .from('conversations')
-      .insert({
-        user_id: userId,
-        repo_id: repoId,
+    try {
+      const convsRef = collection(db, 'users', userId, 'conversations');
+      const docRef = await addDoc(convsRef, {
         title: 'New Conversation',
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating conversation:', error);
-      toast({
-        title: "Error creating conversation",
-        description: error.message,
-        variant: "destructive",
+        repoId: repoId || null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
+
+      setCurrentConversationId(docRef.id);
+      setMessages([]);
+      toast({ title: 'New conversation started', description: 'Start chatting to build your website!' });
+      return docRef.id;
+    } catch (error: any) {
+      console.error('Error creating conversation:', error);
+      toast({ title: 'Error creating conversation', description: error.message, variant: 'destructive' });
       return null;
     }
+  }, [userId, repoId, toast]);
 
-    setCurrentConversationId(data.id);
-    setMessages([]);
-    toast({
-      title: "New conversation started",
-      description: "Start chatting to build your website!",
-    });
-    return data.id;
-  };
-
-  // Save message
   const saveMessage = async (message: Omit<Message, 'id' | 'timestamp'>) => {
     if (!userId || !currentConversationId) return;
 
-    const { error } = await supabase.from('chat_messages').insert({
-      user_id: userId,
-      repo_id: repoId,
-      conversation_id: currentConversationId,
-      role: message.role,
-      content: message.content,
-      tool_calls: message.toolCalls,
-      commit_url: message.commitUrl,
-    });
+    try {
+      const msgsRef = collection(db, 'users', userId, 'conversations', currentConversationId, 'messages');
+      await addDoc(msgsRef, {
+        role: message.role,
+        content: message.content,
+        toolCalls: message.toolCalls || null,
+        commitUrl: message.commitUrl || null,
+        createdAt: serverTimestamp(),
+      });
 
-    if (error) {
+      // Update conversation updatedAt
+      await updateDoc(doc(db, 'users', userId, 'conversations', currentConversationId), {
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error: any) {
       console.error('Error saving message:', error);
-      toast({
-        title: "Error saving message",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: 'Error saving message', description: error.message, variant: 'destructive' });
     }
-
-    // Update conversation updated_at
-    await supabase
-      .from('conversations')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', currentConversationId);
   };
 
-  // Delete conversation
   const deleteConversation = async (id: string) => {
-    const { error } = await supabase
-      .from('conversations')
-      .delete()
-      .eq('id', id);
+    if (!userId) return;
 
-    if (error) {
+    try {
+      await deleteDoc(doc(db, 'users', userId, 'conversations', id));
+      if (currentConversationId === id) {
+        setCurrentConversationId(null);
+        setMessages([]);
+      }
+    } catch (error: any) {
       console.error('Error deleting conversation:', error);
-      toast({
-        title: "Error deleting conversation",
-        description: error.message,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (currentConversationId === id) {
-      setCurrentConversationId(null);
-      setMessages([]);
+      toast({ title: 'Error deleting conversation', description: error.message, variant: 'destructive' });
     }
   };
 
-  // Update conversation title
   const updateConversationTitle = async (id: string, title: string) => {
-    const { error } = await supabase
-      .from('conversations')
-      .update({ title })
-      .eq('id', id);
-
-    if (error) {
+    if (!userId) return;
+    try {
+      await updateDoc(doc(db, 'users', userId, 'conversations', id), { title });
+    } catch (error: any) {
       console.error('Error updating conversation title:', error);
     }
   };

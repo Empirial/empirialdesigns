@@ -6,12 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
+import { onAuthStateChanged } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
+import { auth, functions } from '@/integrations/firebase/config';
 import { useToast } from '@/hooks/use-toast';
 import { Sparkles, Loader2, CheckCircle2, ArrowLeft } from 'lucide-react';
-import type { User } from '@supabase/supabase-js';
-
-const SUPABASE_URL = "https://vfysnkkzesbovtnmoccb.supabase.co";
+import type { User } from 'firebase/auth';
 
 interface GenerationStep {
   id: number;
@@ -43,59 +43,60 @@ const GenerateWebsite = () => {
   const [generatedRepo, setGeneratedRepo] = useState<any>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
       } else {
         navigate('/auth');
       }
     });
+    return () => unsubscribe();
   }, [navigate]);
 
   const websiteTypes = [
-    { 
-      value: 'landing', 
-      label: 'Landing Page', 
+    {
+      value: 'landing',
+      label: 'Landing Page',
       description: 'Modern landing page with hero, features, and CTA',
       preview: '🎯',
       features: ['Hero Section', 'Features', 'Testimonials', 'Call-to-Action', 'Responsive Design'],
       color: 'bg-blue-500'
     },
-    { 
-      value: 'ecommerce', 
-      label: 'E-commerce Store', 
+    {
+      value: 'ecommerce',
+      label: 'E-commerce Store',
       description: 'Online store with products, cart, and checkout',
       preview: '🛒',
       features: ['Product Catalog', 'Shopping Cart', 'Checkout', 'Product Details', 'Payment Ready'],
       color: 'bg-green-500'
     },
-    { 
-      value: 'blog', 
-      label: 'Blog', 
+    {
+      value: 'blog',
+      label: 'Blog',
       description: 'Content blog with posts, categories, and archives',
       preview: '✍️',
       features: ['Post Listing', 'Categories', 'Search', 'Archive', 'Reading Experience'],
       color: 'bg-purple-500'
     },
-    { 
-      value: 'portfolio', 
-      label: 'Portfolio', 
+    {
+      value: 'portfolio',
+      label: 'Portfolio',
       description: 'Showcase your work and projects',
       preview: '🎨',
       features: ['Project Showcase', 'Gallery', 'About Section', 'Contact Form', 'Modern Design'],
       color: 'bg-pink-500'
     },
-    { 
-      value: 'saas', 
-      label: 'SaaS Landing', 
+    {
+      value: 'saas',
+      label: 'SaaS Landing',
       description: 'Software product landing with pricing and features',
       preview: '💼',
       features: ['Pricing Tiers', 'Feature Showcase', 'Integrations', 'Testimonials', 'Sign-up CTA'],
       color: 'bg-indigo-500'
     },
-    { 
-      value: 'restaurant', 
-      label: 'Restaurant', 
+    {
+      value: 'restaurant',
+      label: 'Restaurant',
       description: 'Menu, reservations, and location info',
       preview: '🍽️',
       features: ['Menu Display', 'Reservations', 'Location Map', 'Gallery', 'Contact Info'],
@@ -166,64 +167,22 @@ const GenerateWebsite = () => {
 
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
-
-      if (!accessToken) {
-        throw new Error('Not authenticated. Please sign in again.');
-      }
-
-      // Show progress toast
-      const progressToast = toast({
+      toast({
         title: "Generating Website",
         description: "Creating repository and generating files...",
       });
 
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/create-website`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          prompt: formData.prompt,
-          repoName: formData.repoName || undefined,
-          websiteType: formData.websiteType,
-          companyName: formData.companyName || undefined,
-        }),
+      const createWebsite = httpsCallable(functions, 'createWebsite');
+      const result = await createWebsite({
+        prompt: formData.prompt,
+        repoName: formData.repoName || undefined,
+        websiteType: formData.websiteType,
+        companyName: formData.companyName || undefined,
       });
 
-      let errorData;
-      try {
-        errorData = await response.json();
-      } catch {
-        errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
-      }
+      const data = result.data as any;
+      if (!data?.repo) throw new Error('Invalid response from server');
 
-      if (!response.ok) {
-        // Handle specific error types
-        if (response.status === 401) {
-          throw new Error('Authentication failed. Please sign in again.');
-        } else if (response.status === 429) {
-          throw new Error('Too many requests. Please wait a moment and try again.');
-        } else if (response.status === 400) {
-          throw new Error(errorData.error || 'Invalid request. Please check your input.');
-        } else if (response.status === 500) {
-          throw new Error(errorData.error || 'Server error. Please try again later.');
-        } else if (errorData.error?.includes('already exists')) {
-          throw new Error(`Repository "${formData.repoName}" already exists. Please choose a different name.`);
-        } else if (errorData.error?.includes('token')) {
-          throw new Error('GitHub token error. Please check your configuration.');
-        } else {
-          throw new Error(errorData.error || `Failed to generate website (${response.status})`);
-        }
-      }
-
-      if (!errorData.repo) {
-        throw new Error('Invalid response from server');
-      }
-
-      const data = errorData;
       setGeneratedRepo(data.repo);
 
       toast({
@@ -238,9 +197,21 @@ const GenerateWebsite = () => {
 
     } catch (error: any) {
       console.error('Generation error:', error);
-      
-      // Network errors
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+
+      const msg = error.message || '';
+      if (msg.includes('already exists')) {
+        toast({
+          title: "Error",
+          description: `Repository "${formData.repoName}" already exists. Please choose a different name.`,
+          variant: "destructive",
+        });
+      } else if (msg.includes('token')) {
+        toast({
+          title: "Error",
+          description: 'GitHub token error. Please check your configuration.',
+          variant: "destructive",
+        });
+      } else if (error.name === 'TypeError' && msg.includes('fetch')) {
         toast({
           title: "Network Error",
           description: "Could not connect to server. Please check your internet connection.",
@@ -249,7 +220,7 @@ const GenerateWebsite = () => {
       } else {
         toast({
           title: "Error",
-          description: error.message || "Failed to generate website. Please try again.",
+          description: msg || "Failed to generate website. Please try again.",
           variant: "destructive",
         });
       }
@@ -571,4 +542,3 @@ const GenerateWebsite = () => {
 };
 
 export default GenerateWebsite;
-

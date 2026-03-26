@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -15,26 +15,28 @@ const Navigation = () => {
     }
   };
 
+  // Handle scroll-to-section after navigation to homepage
+  useEffect(() => {
+    const scrollTo = (location.state as any)?.scrollTo;
+    if (scrollTo && location.pathname === '/') {
+      scrollToSection('#' + scrollTo);
+    }
+  }, [location]);
+
   const handleNavClick = (href: string) => {
     if (href.startsWith('/')) {
-      // Route navigation
       navigate(href);
     } else if (href.startsWith('#')) {
-      // Section scrolling - only if on homepage
       if (location.pathname === '/') {
         scrollToSection(href);
       } else {
-        // Navigate to homepage first, then scroll
-        navigate('/');
-        setTimeout(() => {
-          scrollToSection(href);
-        }, 100);
+        navigate('/', { state: { scrollTo: href.replace('#', '') } });
       }
     }
   };
 
   const openWhatsApp = () => {
-    window.open('https://wa.me/message/6ZHJUVYQDOH3O1', '_blank');
+    window.open('https://wa.me/27606691849', '_blank');
   };
 
   const navItems = [

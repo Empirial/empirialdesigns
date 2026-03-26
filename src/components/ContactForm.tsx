@@ -11,8 +11,6 @@ const ContactForm = () => {
     timeline: '',
     message: ''
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({
@@ -40,6 +38,7 @@ ${formData.message}`;
 
     const whatsappUrl = `https://wa.me/27606691849?text=${encodeURIComponent(whatsappMessage)}`;
     window.open(whatsappUrl, '_blank');
+    setFormData({ from_name: '', from_email: '', phone: '', company: '', project_type: '', budget: '', timeline: '', message: '' });
   };
 
   return (
@@ -141,10 +140,10 @@ ${formData.message}`;
               className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Select budget range</option>
-              <option value="under-5k">Under $5,000</option>
-              <option value="5k-10k">$5,000 - $10,000</option>
-              <option value="10k-25k">$10,000 - $25,000</option>
-              <option value="25k-plus">$25,000+</option>
+              <option value="under-2k">Under R2,000</option>
+              <option value="2k-5k">R2,000 - R5,000</option>
+              <option value="5k-10k">R5,000 - R10,000</option>
+              <option value="10k-plus">R10,000+</option>
             </select>
           </div>
         </div>
@@ -186,27 +185,10 @@ ${formData.message}`;
 
         <button
           type="submit"
-          disabled={isSubmitting}
-          className={`w-full py-3 px-6 rounded-md font-medium transition-colors ${
-            isSubmitting
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-primary text-primary-foreground hover:bg-primary/90'
-          }`}
+          className="w-full py-3 px-6 rounded-md font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
         >
-          {isSubmitting ? 'Sending...' : 'Send Message'}
+          Send Message via WhatsApp
         </button>
-
-        {submitStatus === 'success' && (
-          <div className="p-4 bg-green-50 border border-green-200 rounded-md text-green-800">
-            Thank you! Your message has been sent successfully. We'll get back to you soon.
-          </div>
-        )}
-
-        {submitStatus === 'error' && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
-            Sorry, there was an error sending your message. Please try again or contact us directly.
-          </div>
-        )}
       </form>
     </div>
   );

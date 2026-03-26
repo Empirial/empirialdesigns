@@ -9,7 +9,7 @@ const Hero = () => {
   };
 
   const openWhatsApp = () => {
-    window.open('https://wa.me/message/6ZHJUVYQDOH3O1', '_blank');
+    window.open('https://wa.me/27606691849', '_blank');
   };
 
   return (
