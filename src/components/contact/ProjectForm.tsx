@@ -62,7 +62,7 @@ ${formData.brief}
     const encodedMessage = encodeURIComponent(whatsappMessage);
     
     // Open WhatsApp
-    window.open(`https://wa.me/27818885950?text=${encodedMessage}`, '_blank');
+    window.open(`https://wa.me/27651859143?text=${encodedMessage}`, '_blank');
     
     toast({
       title: "Redirected to WhatsApp!",

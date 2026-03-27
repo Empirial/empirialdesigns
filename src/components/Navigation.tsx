@@ -36,7 +36,7 @@ const Navigation = () => {
   };
 
   const openWhatsApp = () => {
-    window.open('https://wa.me/27606691849', '_blank');
+    window.open('https://wa.me/27651859143', '_blank');
   };
 
   const navItems = [

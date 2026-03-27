@@ -36,7 +36,7 @@ const ContactForm = () => {
 *Message:*
 ${formData.message}`;
 
-    const whatsappUrl = `https://wa.me/27606691849?text=${encodeURIComponent(whatsappMessage)}`;
+    const whatsappUrl = `https://wa.me/27651859143?text=${encodeURIComponent(whatsappMessage)}`;
     window.open(whatsappUrl, '_blank');
     setFormData({ from_name: '', from_email: '', phone: '', company: '', project_type: '', budget: '', timeline: '', message: '' });
   };

@@ -41,7 +41,7 @@ const SEOAudit = () => {
   const { toast } = useToast();
 
   const openWhatsApp = () => {
-    window.open('https://wa.me/message/6ZHJUVYQDOH3O1', '_blank');
+    window.open('https://wa.me/27651859143', '_blank');
   };
 
   const handleAudit = async () => {
