@@ -16,7 +16,7 @@ import TextEx from "./pages/TextEx";
 const Auth = lazy(() => import("./pages/Auth"));
 const ChatInterface = lazy(() => import("./pages/ChatInterface"));
 const Preview = lazy(() => import("./pages/Preview"));
-const RepoManagement = lazy(() => import("./pages/RepoManagement"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
 const GenerateWebsite = lazy(() => import("./pages/GenerateWebsite"));
 
 const queryClient = new QueryClient();
@@ -32,7 +32,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/chat" element={<ChatInterface />} />
-            <Route path="/repos" element={<RepoManagement />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/generate" element={<GenerateWebsite />} />
             <Route path="/preview/:repoId" element={<Preview />} />
             <Route path="/blog" element={<Blog />} />

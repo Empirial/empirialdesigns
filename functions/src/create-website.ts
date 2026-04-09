@@ -29,10 +29,10 @@ export const createWebsite = onCall({ timeoutSeconds: 540, memory: '1GiB' }, asy
   const uid = request.auth.uid;
   const { prompt, repoName: providedRepoName, websiteType, companyName } = request.data;
 
-  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+  const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
   const GITHUB_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
 
-  if (!OPENROUTER_API_KEY) throw new HttpsError('internal', 'OPENROUTER_API_KEY not configured');
+  if (!DEEPSEEK_API_KEY) throw new HttpsError('internal', 'DEEPSEEK_API_KEY not configured');
   if (!GITHUB_TOKEN) throw new HttpsError('internal', 'GITHUB_TOKEN not configured');
 
   const detected = detectWebsiteType(prompt);
@@ -63,14 +63,14 @@ Provide ALL files with this format:
 
 Include: package.json, vite.config.ts, tsconfig.json, index.html, src/main.tsx, src/App.tsx, src/index.css, components. Make it complete and working.`;
 
-  const models = ['deepseek/deepseek-r1-0528', 'deepseek/deepseek-r1', 'google/gemini-pro', 'mistralai/mistral-large'];
+  const models = ['deepseek-chat'];
   let aiResponse = '';
 
   for (const model of models) {
     try {
-      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${OPENROUTER_API_KEY}`, 'HTTP-Referer': 'https://empirialdesigns.co.za', 'X-Title': 'Empirial Designs', 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${DEEPSEEK_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }] }),
       });
       if (r.ok) {

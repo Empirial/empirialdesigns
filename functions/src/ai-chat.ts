@@ -43,12 +43,7 @@ export const aiChat = onRequest({
     const db = admin.firestore();
     const lastUserMessage = messages[messages.length - 1]?.content || '';
 
-    const models = [
-      'deepseek/deepseek-r1-0528',
-      'deepseek/deepseek-r1',
-      'google/gemini-pro',
-      'mistralai/mistral-large',
-    ];
+    const models = ['deepseek-chat'];
 
     // Fetch repo structure from GitHub
     async function fetchRepoStructure(path = '', maxDepth = 3, depth = 0): Promise<any[]> {
@@ -162,12 +157,10 @@ CRITICAL: Always provide the COMPLETE file with your changes.`;
     let aiResponse: Response | undefined;
     for (const model of models) {
       try {
-        const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-            'HTTP-Referer': 'https://empirialdesigns.co.za',
-            'X-Title': 'Empirial Designs',
+            'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, ...messages], stream: true }),

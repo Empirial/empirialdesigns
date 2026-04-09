@@ -1,774 +1,333 @@
-import { useState, useEffect, useCallback, CSSProperties } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { auth, db, functions } from '@/integrations/firebase/config';
-import { useToast } from '@/hooks/use-toast';
-import {
-  Send,
-  LogOut,
-  RefreshCw,
-  ExternalLink,
-  ArrowLeft,
-  Crosshair,
-  FolderOpen,
-  X,
-  FileCode,
-  Loader2,
-  Check
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/integrations/firebase/config';
 import type { User } from 'firebase/auth';
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  commitUrl?: string;
-}
-
-interface Repo {
-  id: string;
-  repoOwner: string;
-  repoName: string;
-  repoUrl: string;
-  deployUrl?: string;
-  githubToken?: string;
-}
-
-interface FileItem {
-  name: string;
-  path: string;
-  type: 'file' | 'dir';
-  children?: FileItem[];
-}
+import { 
+  History, Clock, Code, Cloud, MoreHorizontal, 
+  PanelLeftClose, Share, Github, Zap, ChevronDown, 
+  Plus, Mic, ArrowUp, Monitor, LayoutTemplate, Link as LinkIcon
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { UpgradeModal } from "@/components/modals/UpgradeModal";
 
 const Preview = () => {
   const { repoId } = useParams<{ repoId: string }>();
+  const [searchParams] = useSearchParams();
+  const initialPrompt = searchParams.get('prompt') || '';
+  
+  const [user, setUser] = useState<User | null>(null);
+  const [prompt, setPrompt] = useState("");
   const navigate = useNavigate();
+
+  // Component State
+  const [isThinking, setIsThinking] = useState(repoId === 'new');
+  const [thoughtExpanded, setThoughtExpanded] = useState(true);
+  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const { toast } = useToast();
 
-  // Core state
-  const [user, setUser] = useState<User | null>(null);
-  const [repo, setRepo] = useState<Repo | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [iframeKey, setIframeKey] = useState(0);
+  const handleShareClick = () => {
+    toast({
+      title: "Workspace Link Copied!",
+      description: "You can now share this workspace with your team.",
+    });
+  };
 
-  // Visual Inspector state
-  const [inspectorActive, setInspectorActive] = useState(false);
-  const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(null);
-  const [highlightStyle, setHighlightStyle] = useState<CSSProperties>({});
-  const [selectedComponent, setSelectedComponent] = useState<string>('');
-
-  // File Selector state
-  const [files, setFiles] = useState<FileItem[]>([]);
-  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
-  const [loadingFiles, setLoadingFiles] = useState(false);
-  const [filesLoaded, setFilesLoaded] = useState(false);
-
-  // Auth and repo loading
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        loadRepo(firebaseUser.uid);
       } else {
         navigate('/auth');
       }
     });
 
     return () => unsubscribe();
-  }, [navigate, repoId]);
-
-  const loadRepo = async (userId: string) => {
-    if (!repoId) return;
-    const repoDoc = await getDoc(doc(db, 'users', userId, 'repos', repoId));
-    if (!repoDoc.exists()) {
-      toast({
-        title: "Error",
-        description: "Repository not found",
-        variant: "destructive",
-      });
-      navigate('/repos');
-      return;
-    }
-
-    setRepo({ id: repoDoc.id, ...repoDoc.data() } as Repo);
-  };
-
-  // Load files when repo is available
-  useEffect(() => {
-    if (repo && !filesLoaded) {
-      loadFiles();
-    }
-  }, [repo, filesLoaded]);
-
-  const loadFiles = async () => {
-    if (!repo) return;
-
-    setLoadingFiles(true);
-    try {
-      const getRepoContents = httpsCallable(functions, 'githubRepoContents');
-      const result = await getRepoContents({
-        owner: repo.repoOwner,
-        repo: repo.repoName,
-        path: '',
-      });
-
-      const data = result.data as any[];
-
-      // Transform GitHub API response to FileItem format
-      const transformedFiles: FileItem[] = Array.isArray(data)
-        ? data.map((item: any) => ({
-            name: item.name,
-            path: item.path,
-            type: item.type === 'dir' ? 'dir' : 'file',
-          }))
-        : [];
-
-      setFiles(transformedFiles);
-      setFilesLoaded(true);
-    } catch (error) {
-      console.error('Error loading files:', error);
-    } finally {
-      setLoadingFiles(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    await signOut(auth);
-    navigate('/');
-  };
-
-  const refreshPreview = () => {
-    setIframeKey(prev => prev + 1);
-    toast({
-      title: "Preview refreshed",
-      description: "Loading latest changes...",
-    });
-  };
-
-  // Visual Inspector Functions
-  const getElementInfo = useCallback((element: HTMLElement) => {
-    const tag = element.tagName.toLowerCase();
-    const classes = Array.from(element.classList).slice(0, 3).join('.');
-    const id = element.id ? `#${element.id}` : '';
-    const textContent = element.textContent?.slice(0, 30)?.trim() || '';
-
-    // Try to infer component name from data attributes or class patterns
-    let componentName = '';
-    if (element.dataset.component) {
-      componentName = element.dataset.component;
-    } else if (classes.includes('btn') || tag === 'button') {
-      componentName = 'Button';
-    } else if (tag === 'input' || tag === 'textarea') {
-      componentName = 'Input';
-    } else if (tag === 'nav') {
-      componentName = 'Navigation';
-    } else if (tag === 'header') {
-      componentName = 'Header';
-    } else if (tag === 'footer') {
-      componentName = 'Footer';
-    } else if (classes.includes('card')) {
-      componentName = 'Card';
-    }
-
-    return {
-      tag,
-      classes: classes ? `.${classes}` : '',
-      id,
-      textContent,
-      componentName,
-      fullSelector: `${tag}${id}${classes ? '.' + classes : ''}`
-    };
-  }, []);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!inspectorActive) return;
-
-    const iframe = document.querySelector('iframe');
-    if (!iframe) return;
-
-    const iframeRect = iframe.getBoundingClientRect();
-
-    // Check if mouse is over the overlay area (which covers the iframe)
-    const overlayElement = document.querySelector('[data-inspector-overlay]');
-    if (!overlayElement) return;
-
-    const overlayRect = overlayElement.getBoundingClientRect();
-
-    if (
-      e.clientX >= overlayRect.left &&
-      e.clientX <= overlayRect.right &&
-      e.clientY >= overlayRect.top &&
-      e.clientY <= overlayRect.bottom
-    ) {
-      // Calculate position relative to iframe
-      const relX = e.clientX - iframeRect.left;
-      const relY = e.clientY - iframeRect.top;
-
-      // Create a highlight box at cursor position (simulated)
-      setHighlightStyle({
-        position: 'absolute',
-        left: `${e.clientX - overlayRect.left - 50}px`,
-        top: `${e.clientY - overlayRect.top - 25}px`,
-        width: '100px',
-        height: '50px',
-        border: '2px solid hsl(var(--primary))',
-        backgroundColor: 'hsl(var(--primary) / 0.1)',
-        pointerEvents: 'none',
-        borderRadius: '4px',
-        zIndex: 9999,
-      });
-    }
-  }, [inspectorActive]);
-
-  const handleInspectorClick = useCallback((e: MouseEvent) => {
-    if (!inspectorActive) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Since we can't access iframe content directly due to cross-origin,
-    // we capture the click position and create a description
-    const iframe = document.querySelector('iframe');
-    if (!iframe) return;
-
-    const iframeRect = iframe.getBoundingClientRect();
-    const relX = e.clientX - iframeRect.left;
-    const relY = e.clientY - iframeRect.top;
-
-    // Calculate percentage position for better description
-    const xPercent = Math.round((relX / iframeRect.width) * 100);
-    const yPercent = Math.round((relY / iframeRect.height) * 100);
-
-    let location = '';
-    if (yPercent < 15) location = 'header/navigation area';
-    else if (yPercent > 85) location = 'footer area';
-    else if (xPercent < 25) location = 'left sidebar area';
-    else if (xPercent > 75) location = 'right sidebar area';
-    else location = 'main content area';
-
-    const description = `Element at ${location} (${xPercent}% from left, ${yPercent}% from top)`;
-
-    setSelectedComponent(description);
-    setInspectorActive(false);
-    setHighlightStyle({});
-
-    toast({
-      title: "Element selected",
-      description: description,
-    });
-  }, [inspectorActive, toast]);
-
-  // Inspector event listeners
-  useEffect(() => {
-    if (inspectorActive) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('click', handleInspectorClick, true);
-
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('click', handleInspectorClick, true);
-      };
-    }
-  }, [inspectorActive, handleMouseMove, handleInspectorClick]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl/Cmd + I to toggle inspector
-      if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
-        e.preventDefault();
-        setInspectorActive(prev => !prev);
-      }
-      // Escape to cancel inspector
-      if (e.key === 'Escape' && inspectorActive) {
-        setInspectorActive(false);
-        setHighlightStyle({});
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [inspectorActive]);
-
-  const toggleFileSelection = (filePath: string) => {
-    setSelectedFiles(prev =>
-      prev.includes(filePath)
-        ? prev.filter(f => f !== filePath)
-        : [...prev, filePath]
-    );
-  };
-
-  const clearAllSelections = () => {
-    setSelectedFiles([]);
-    setSelectedComponent('');
-  };
-
-  const handleSend = async () => {
-    if (!input.trim() || !repo) return;
-
-    // Build context message
-    let contextPrefix = '';
-    if (selectedFiles.length > 0 || selectedComponent) {
-      contextPrefix = '[Context: ';
-      if (selectedFiles.length > 0) {
-        contextPrefix += `Files: ${selectedFiles.join(', ')}`;
-      }
-      if (selectedComponent) {
-        if (selectedFiles.length > 0) contextPrefix += '; ';
-        contextPrefix += `Selected: ${selectedComponent}`;
-      }
-      contextPrefix += ']\n\n';
-    }
-
-    const fullMessage = contextPrefix + input;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input, // Show original input in UI
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setLoading(true);
-
-    // Clear selections after sending
-    setSelectedFiles([]);
-    setSelectedComponent('');
-
-    try {
-      const FUNCTIONS_URL = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL;
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await fetch(`${FUNCTIONS_URL}/aiChat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          messages: [
-            ...messages.map(m => ({ role: m.role, content: m.content })),
-            { role: 'user', content: fullMessage } // Send with context
-          ],
-          repoOwner: repo.repoOwner,
-          repoName: repo.repoName,
-          repoId: repo.id,
-          selectedFiles: selectedFiles.length > 0 ? selectedFiles : undefined,
-        }),
-      });
-
-      if (!response.ok) {
-        let message = 'Failed to get AI response';
-        try {
-          const text = await response.text();
-          try {
-            const json = JSON.parse(text);
-            message = json.error || message;
-          } catch {
-            message = text || message;
-          }
-        } catch {}
-        throw new Error(message);
-      }
-
-      if (!response.body) {
-        throw new Error('No response body');
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let assistantContent = '';
-      let textBuffer = '';
-      let streamDone = false;
-      let commitUrl = '';
-
-      const assistantId = (Date.now() + 1).toString();
-      setMessages(prev => [...prev, {
-        id: assistantId,
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-      }]);
-
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-
-          if (line.endsWith('\r')) line = line.slice(0, -1);
-          if (line.startsWith(':') || line.trim() === '') continue;
-          if (!line.startsWith('data: ')) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') {
-            streamDone = true;
-            break;
-          }
-
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              assistantContent += content;
-              setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, content: assistantContent } : m
-              ));
-            }
-
-            if (parsed.commit_url) {
-              commitUrl = parsed.commit_url;
-            }
-          } catch (e) {
-            textBuffer = line + '\n' + textBuffer;
-            break;
-          }
-        }
-      }
-
-      if (commitUrl) {
-        setMessages(prev => prev.map(m =>
-          m.id === assistantId ? { ...m, commitUrl } : m
-        ));
-
-        setTimeout(() => refreshPreview(), 2000);
-      }
-
-      setLoading(false);
-    } catch (error: any) {
-      console.error('Chat error:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to get AI response",
-        variant: "destructive",
-      });
-      setLoading(false);
-    }
-  };
-
-  if (!user || !repo) {
-    return null;
-  }
-
-  const previewUrl = repo.deployUrl || `https://${repo.repoName}.netlify.app`;
-  const hasSelections = selectedFiles.length > 0 || selectedComponent;
+  }, [navigate]);
 
   return (
-    <div className="h-screen flex bg-background">
-      {/* Chat Sidebar */}
-      <div className="w-96 border-r border-border bg-muted/20 flex flex-col">
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/repos')}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSignOut}
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+    <>
+    <div className="h-screen w-full flex flex-col bg-[#09090b] text-zinc-300 font-sans overflow-hidden">
+      {/* Top Navigation Bar */}
+      <header className="h-14 flex items-center justify-between px-3 border-b border-[#27272a] shrink-0 bg-[#09090b]">
+        {/* Left: Branding & Status */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 cursor-pointer hover:bg-zinc-800/50 p-1.5 rounded transition-colors">
+            <div className="bg-primary/20 text-primary rounded font-semibold w-6 h-6 flex items-center justify-center text-xs">
+              E
+            </div>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1 text-sm font-semibold text-zinc-100">
+                Fit Life Hub <ChevronDown className="w-3 h-3 text-zinc-500" />
+              </div>
+              <span className="text-[10px] text-zinc-500">Previewing last saved version</span>
+            </div>
           </div>
-          <div>
-            <h2 className="font-bold text-lg truncate">{repo.repoName}</h2>
-            <p className="text-sm text-muted-foreground truncate">{repo.repoOwner}</p>
+          
+          <div className="flex items-center gap-2 text-zinc-500">
+            <button className="hover:text-zinc-300 transition-colors p-1"><History className="w-4 h-4" /></button>
+            <button className="hover:text-zinc-300 transition-colors p-1"><Clock className="w-4 h-4" /></button>
           </div>
         </div>
 
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
-            {messages.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground text-sm">
-                  Ask me to make changes to your site
-                </p>
-                <p className="text-muted-foreground text-xs mt-2">
-                  Use the inspector (⌘I) to select elements
-                </p>
-              </div>
-            ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted border border-border'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    {message.commitUrl && (
-                      <a
-                        href={message.commitUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline flex items-center gap-1 mt-2"
-                      >
-                        View commit <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-muted border border-border">
-                  <div className="flex gap-2">
-                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
-                </div>
-              </div>
-            )}
+        {/* Center: Tools & URL Bar */}
+        <div className="flex items-center flex-1 justify-center max-w-2xl px-4">
+          <div className="flex items-center gap-1 bg-[#18181b] p-1 rounded-md border border-[#27272a]">
+            {/* View toggles */}
+            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded text-xs font-semibold">
+              <Monitor className="w-3.5 h-3.5" /> Preview
+            </button>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-zinc-400 hover:text-zinc-200 transition-colors text-xs font-medium">
+              <LayoutTemplate className="w-3.5 h-3.5" />
+            </button>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-zinc-400 hover:text-zinc-200 transition-colors text-xs font-medium">
+              <Code className="w-3.5 h-3.5" />
+            </button>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-zinc-400 hover:text-zinc-200 transition-colors text-xs font-medium">
+              <Cloud className="w-3.5 h-3.5" />
+            </button>
+            <button className="flex items-center gap-1.5 px-2 py-1.5 text-zinc-400 hover:text-zinc-200 transition-colors text-xs font-medium">
+               <MoreHorizontal className="w-3.5 h-3.5" />
+            </button>
           </div>
-        </ScrollArea>
-
-        {/* Selected Context Badges */}
-        {hasSelections && (
-          <div className="px-4 py-2 border-t border-border">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground">Context:</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearAllSelections}
-                className="h-6 px-2 text-xs"
-              >
-                Clear all
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {selectedFiles.map(file => (
-                <Badge
-                  key={file}
-                  variant="secondary"
-                  className="text-xs flex items-center gap-1"
-                >
-                  <FileCode className="h-3 w-3" />
-                  {file.split('/').pop()}
-                  <button
-                    onClick={() => toggleFileSelection(file)}
-                    className="ml-1 hover:text-destructive"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {selectedComponent && (
-                <Badge
-                  variant="outline"
-                  className="text-xs flex items-center gap-1 border-primary"
-                >
-                  <Crosshair className="h-3 w-3" />
-                  Element
-                  <button
-                    onClick={() => setSelectedComponent('')}
-                    className="ml-1 hover:text-destructive"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-            </div>
+          
+          <div className="ml-4 flex-1 flex items-center bg-[#18181b] border border-[#27272a] rounded-md h-9 px-3 gap-2">
+            <Monitor className="w-3.5 h-3.5 text-zinc-500" />
+            <div className="text-sm text-zinc-300 flex-1 truncate">/</div>
           </div>
-        )}
+        </div>
 
-        {/* Input Area */}
-        <div className="border-t border-border p-4">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="space-y-3"
+        {/* Right: Actions */}
+        <div className="flex items-center gap-3">
+          <button className="text-zinc-400 hover:text-zinc-200 transition-colors p-1.5" onClick={() => navigate('/dashboard')}>
+            <PanelLeftClose className="w-5 h-5" />
+          </button>
+          
+          <div className="w-[1px] h-4 bg-zinc-700"></div>
+          
+          <div 
+            onClick={handleShareClick}
+            className="flex items-center gap-1.5 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 rounded-full px-3 py-1.5 cursor-pointer transition-colors text-xs font-medium text-zinc-300"
           >
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2">
-              {/* File Selector */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={`rounded-full ${selectedFiles.length > 0 ? 'border-primary' : ''}`}
-                    disabled={loadingFiles}
-                  >
-                    {loadingFiles ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <FolderOpen className="h-4 w-4" />
-                    )}
-                    <span className="ml-2">Files</span>
-                    {selectedFiles.length > 0 && (
-                      <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-                        {selectedFiles.length}
-                      </Badge>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64 max-h-80 overflow-auto">
-                  <DropdownMenuLabel>Select files for context</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {files.length === 0 ? (
-                    <div className="py-4 text-center text-sm text-muted-foreground">
-                      {loadingFiles ? 'Loading files...' : 'No files available'}
-                    </div>
-                  ) : (
-                    files.filter(f => f.type === 'file').map(file => (
-                      <DropdownMenuCheckboxItem
-                        key={file.path}
-                        checked={selectedFiles.includes(file.path)}
-                        onCheckedChange={() => toggleFileSelection(file.path)}
-                      >
-                        <FileCode className="h-4 w-4 mr-2 text-muted-foreground" />
-                        {file.name}
-                      </DropdownMenuCheckboxItem>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Inspector Toggle */}
-              <Button
-                type="button"
-                variant={inspectorActive ? "default" : "outline"}
-                size="sm"
-                onClick={() => setInspectorActive(!inspectorActive)}
-                className={`rounded-full ${selectedComponent ? 'border-primary' : ''}`}
-                title="Toggle Visual Inspector (⌘I)"
-              >
-                <Crosshair className="h-4 w-4" />
-                <span className="ml-2">Inspect</span>
-                {selectedComponent && (
-                  <Check className="h-4 w-4 ml-1 text-green-500" />
-                )}
-              </Button>
+            <div className="w-4 h-4 bg-primary text-black rounded-full flex items-center justify-center font-bold text-[8px]">
+              {user?.email?.charAt(0).toUpperCase() || 'E'}
             </div>
+            Share
+          </div>
+          
+          <button className="text-zinc-400 hover:text-zinc-200 transition-colors p-1.5">
+             <Github className="w-4 h-4" />
+          </button>
+          
+          <button 
+             onClick={() => setIsUpgradeOpen(true)}
+             className="flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-md px-3 py-1.5 transition-colors text-xs font-bold"
+          >
+            <Zap className="w-3.5 h-3.5 fill-primary" /> Upgrade
+          </button>
+          
+          <button className="bg-primary hover:bg-primary/90 text-black rounded-md px-4 py-1.5 transition-colors text-xs font-bold shadow-[0_0_15px_rgba(251,191,36,0.3)]">
+            Publish
+          </button>
+        </div>
+      </header>
 
-            {/* Text Input */}
-            <div className="flex gap-2">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={hasSelections ? "Describe changes to selected..." : "Describe changes..."}
-                className="flex-1 rounded-full"
-                disabled={loading}
-              />
-              <Button
-                type="submit"
-                size="icon"
-                className="rounded-full"
-                disabled={loading || !input.trim()}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+      {/* Main Workspace */}
+      <div className="flex flex-1 overflow-hidden">
+        
+        {/* Left Side: Chat Workspace */}
+        <div className="w-96 min-w-[24rem] shrink-0 flex flex-col bg-[#18181b] border-r border-[#27272a]">
+          
+          {/* Scrollable Chat Area */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+            <div className="text-center text-xs text-zinc-500 pt-2 pb-4">
+              Apr 3 at 9:54 PM
             </div>
-          </form>
-        </div>
-      </div>
-
-      {/* Preview Area */}
-      <div className="flex-1 flex flex-col relative">
-        <div className="h-16 border-b border-border flex items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold">Live Preview</h1>
-            {inspectorActive && (
-              <Badge variant="default" className="animate-pulse">
-                Inspector Active - Click to select
-              </Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refreshPreview}
-              className="rounded-full"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(previewUrl, '_blank')}
-              className="rounded-full"
-            >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Open
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex-1 bg-muted/20 relative">
-          <iframe
-            key={iframeKey}
-            src={previewUrl}
-            className="w-full h-full border-0"
-            title="Site Preview"
-          />
-
-          {/* Inspector Overlay */}
-          {inspectorActive && (
-            <div
-              data-inspector-overlay
-              className="absolute inset-0 cursor-crosshair"
-              style={{ backgroundColor: 'rgba(0,0,0,0.05)' }}
-            >
-              {/* Highlight Box */}
-              <div style={highlightStyle} />
-
-              {/* Instructions Tooltip */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background border border-border rounded-lg px-4 py-2 shadow-lg">
-                <p className="text-sm text-muted-foreground">
-                  Click on an element to select it • Press <kbd className="px-1 py-0.5 bg-muted rounded text-xs">Esc</kbd> to cancel
-                </p>
+            
+            {/* User Message */}
+            <div className="flex justify-end">
+              <div className="bg-[#27272a] text-zinc-100 rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm max-w-[85%] shadow-sm leading-relaxed">
+                {initialPrompt || "lets build a workout website"}
               </div>
             </div>
-          )}
+
+            {/* AI Thought Process */}
+            <div className="space-y-3">
+               <div 
+                  className="flex items-center gap-2 cursor-pointer group"
+                  onClick={() => setThoughtExpanded(!thoughtExpanded)}
+               >
+                 <span className="text-xs font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                   Thought for 13s
+                 </span>
+                 <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform duration-200 ${thoughtExpanded ? 'rotate-180' : ''}`} />
+               </div>
+               
+               {thoughtExpanded && (
+                 <div className="text-[13px] text-zinc-400 leading-relaxed border-l-2 border-[#27272a] pl-3 py-1">
+                   This evokes raw energy — think Nike Training Club meets brutalist fitness aesthetics. I'll draw inspiration from <strong className="text-zinc-200 font-semibold">dark, high-contrast athletic brands</strong> with bold typography and dynamic layouts.
+                 </div>
+               )}
+            </div>
+
+            {/* AI Response Features */}
+            <div className="space-y-3 text-[13px] text-zinc-300">
+               <p className="font-semibold text-zinc-100">First version features:</p>
+               <ul className="space-y-2.5">
+                 <li className="flex items-start gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-zinc-600 mt-1.5 shrink-0" />
+                   <span className="leading-relaxed">Hero section with motivational headline and CTA</span>
+                 </li>
+                 <li className="flex items-start gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-zinc-600 mt-1.5 shrink-0" />
+                   <span className="leading-relaxed">Featured workouts grid (cardio, strength, flexibility)</span>
+                 </li>
+                 <li className="flex items-start gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-zinc-600 mt-1.5 shrink-0" />
+                   <span className="leading-relaxed">Stats/benefits section</span>
+                 </li>
+               </ul>
+            </div>
+            
+            {/* Action Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar pt-2">
+               <button className="shrink-0 bg-[#27272a] hover:bg-[#3f3f46] text-zinc-300 border border-[#3f3f46] rounded-full px-3 py-1.5 text-xs font-medium transition-colors">
+                 Test responsiveness
+               </button>
+               <button className="shrink-0 bg-[#27272a] hover:bg-[#3f3f46] text-zinc-300 border border-[#3f3f46] rounded-full px-3 py-1.5 text-xs font-medium transition-colors">
+                 Add pricing plans
+               </button>
+               <button className="shrink-0 bg-[#27272a] hover:bg-[#3f3f46] text-zinc-300 border border-[#3f3f46] rounded-full px-3 py-1.5 text-xs font-medium transition-colors">
+                 Add user auth...
+               </button>
+            </div>
+          </div>
+
+          {/* Sticky Input Area */}
+          <div className="p-4 bg-[#18181b] border-t border-[#27272a]">
+             <form className="w-full bg-[#27272a]/50 border border-[#3f3f46] rounded-xl p-2 flex flex-col shadow-lg transition-colors focus-within:bg-[#27272a]">
+              <div className="relative">
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Ask Empirial..."
+                  className="w-full min-h-[50px] bg-transparent border-none text-zinc-200 placeholder:text-zinc-500 resize-none outline-none p-2 pb-10 text-[13px]"
+                  style={{ overflow: 'hidden' }}
+                />
+              </div>
+
+              {/* Input Action Bar */}
+              <div className="flex items-center justify-between px-1 pb-1 mt-auto">
+                <div className="flex items-center gap-1.5">
+                  <button type="button" className="p-1.5 text-zinc-400 hover:text-white transition-colors">
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <button type="button" className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-700/50 rounded transition-colors">
+                    <Monitor className="w-3.5 h-3.5" /> Visual edits
+                  </button>
+                </div>
+                
+                <div className="flex items-center gap-0.5">
+                  <button type="button" className="flex items-center text-[11px] text-zinc-400 font-medium hover:text-white px-2 cursor-pointer transition-colors">
+                    Build <ChevronDown className="w-3 h-3 ml-1 opacity-70" />
+                  </button>
+                  <button type="button" className="p-1.5 text-zinc-400 hover:text-white transition-colors">
+                    <Mic className="w-3.5 h-3.5" />
+                  </button>
+                  <button 
+                    type="submit" 
+                    className={`ml-1 p-1.5 rounded-full transition-colors ${prompt.trim() ? 'bg-zinc-300 text-black' : 'bg-[#3f3f46] text-zinc-500'}`}
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
         </div>
+
+        {/* Right Side: Iframe/Output Container */}
+        <div className="flex-1 bg-[#09090b] flex flex-col p-4 relative overflow-hidden">
+          
+          <div className="flex-1 w-full h-full bg-[#18181b] border border-[#27272a] rounded-xl overflow-hidden shadow-2xl relative flex flex-col items-center justify-center">
+             
+             {isThinking ? (
+                <div className="flex flex-col items-center justify-center text-zinc-400">
+                   <div className="w-12 h-12 mb-6 relative">
+                     <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
+                     <Monitor className="w-5 h-5 absolute inset-0 m-auto text-primary" />
+                   </div>
+                   <h3 className="text-lg font-semibold text-zinc-200 mb-2">Building your workspace...</h3>
+                   <p className="text-sm text-zinc-500 max-w-[300px] text-center">Empirial is assembling components, configuring tailwind, and preparing the layout.</p>
+                </div>
+             ) : (
+                <iframe 
+                   title="Preview Canvas"
+                   className="w-full h-full bg-black border-none"
+                   srcDoc={`
+                     <html>
+                       <head>
+                         <style>
+                           body { margin: 0; font-family: system-ui, sans-serif; background: #000; color: #fff; }
+                           .nav { display: flex; justify-content: space-between; padding: 2rem; align-items: center; }
+                           .logo { display:flex; align-items: center; gap: 8px; color: #4ade80; font-weight: 800; letter-spacing: 1px; font-size: 1.2rem; }
+                           .links { display: flex; gap: 2rem; color: #a1a1aa; font-weight: 600; font-size: 0.9rem; }
+                           .btn { background: #4ade80; color: #000; padding: 0.75rem 1.5rem; border-radius: 4px; font-weight: 800; border: none; font-size: 0.9rem; }
+                           .btn-outline { background: transparent; border: 1px solid #333; color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; font-weight: 600; }
+                           
+                           .hero { padding: 4rem 2rem; max-width: 800px; }
+                           .badge { color: #4ade80; font-weight: 700; letter-spacing: 3px; font-size: 0.8rem; margin-bottom: 1.5rem; display: block;}
+                           .title { font-size: 5rem; font-weight: 900; line-height: 1; margin: 0 0 1.5rem; letter-spacing: -2px; }
+                           .title span { color: #4ade80; display: block; }
+                           .desc { color: #a1a1aa; font-size: 1.2rem; line-height: 1.6; margin-bottom: 3rem; max-width: 600px; }
+                           
+                           .actions { display: flex; gap: 1rem; }
+                         </style>
+                       </head>
+                       <body>
+                         <nav class="nav">
+                           <div class="logo">
+                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18h12"/><path d="M6 14h12"/><path d="M6 10h12"/><path d="M6 6h12"/></svg>
+                             FORGE
+                           </div>
+                           <div class="links">
+                             <span>WORKOUTS</span>
+                             <span>PROGRAMS</span>
+                             <span>COMMUNITY</span>
+                             <span>PRICING</span>
+                           </div>
+                           <button class="btn">START FREE</button>
+                         </nav>
+                         
+                         <div class="hero">
+                           <span class="badge">TRAIN. TRANSFORM. TRANSCEND.</span>
+                           <h1 class="title">BUILD YOUR <span>STRONGEST</span> SELF</h1>
+                           <p class="desc">Science-backed programs designed for every level. Track progress, crush goals, and join a community that pushes limits.</p>
+                           <div class="actions">
+                             <button class="btn">GET STARTED →</button>
+                             <button class="btn-outline">BROWSE WORKOUTS</button>
+                           </div>
+                         </div>
+                       </body>
+                     </html>
+                   `}
+                />
+             )}
+
+          </div>
+
+          {/* Iframe Scrollbar Fake Handle overlay as seen in picture */}
+          <div className="absolute right-5 top-5 bottom-5 w-2 bg-transparent pointer-events-none z-10 flex flex-col items-center py-2 text-zinc-600">
+             <div className="w-1.5 h-32 bg-zinc-500/30 rounded-full border border-zinc-500/20"></div>
+          </div>
+          
+        </div>
+        
       </div>
+      
     </div>
+    <UpgradeModal open={isUpgradeOpen} onOpenChange={setIsUpgradeOpen} />
+    </>
   );
 };
 

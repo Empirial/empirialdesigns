@@ -122,9 +122,9 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <NavLink to="/repos">
+              <NavLink to="/dashboard">
                 <Settings className="h-4 w-4" />
-                {!collapsed && <span>Manage Repos</span>}
+                {!collapsed && <span>Workspace</span>}
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -1,8 +1,82 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    // ── Helper functions ──────────────────────────────────────────────────────
+
+    // True when the caller is signed in and owns the user document
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // True when every key in `keys` is present in the incoming write
+    function hasFields(keys) {
+      return request.resource.data.keys().hasAll(keys);
+    }
+
+    // ── /users/{userId}/repos ─────────────────────────────────────────────────
+    // Client reads + creates repos; updates/deletes go through Cloud Functions
+    // (which use the Admin SDK and bypass these rules), so we only need to
+    // permit the client operations that actually happen from the browser.
+    match /users/{userId}/repos/{repoId} {
+      // Owner can list/get their own repos
+      allow read: if isOwner(userId);
+
+      // Owner can create a repo document (triggered from Auth.tsx on sign-up)
+      // Require the minimum fields written by the client
+      allow create: if isOwner(userId)
+        && hasFields(['repoName', 'repoOwner', 'repoUrl', 'createdAt'])
+        && request.resource.data.repoName is string
+        && request.resource.data.repoName.size() > 0
+        && request.resource.data.repoName.size() <= 100
+        && request.resource.data.repoOwner is string
+        && request.resource.data.repoUrl is string;
+
+      // Client-side updates are not needed (Cloud Functions handle mutations)
+      allow update, delete: if false;
+    }
+
+    // ── /users/{userId}/conversations ─────────────────────────────────────────
+    match /users/{userId}/conversations/{convId} {
+      // Owner can read (list + get) and delete their own conversations
+      allow read, delete: if isOwner(userId);
+
+      // Owner can create a new conversation
+      allow create: if isOwner(userId)
+        && hasFields(['title', 'createdAt', 'updatedAt'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 500;
+
+      // Owner can update — only title and updatedAt are changed from the client
+      allow update: if isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['title', 'updatedAt'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 500;
+
+      // ── /users/{userId}/conversations/{convId}/messages ─────────────────────
+      match /messages/{msgId} {
+        // Owner can read all messages in their conversations
+        allow read: if isOwner(userId);
+
+        // Owner can add new messages; role must be 'user' or 'assistant'
+        allow create: if isOwner(userId)
+          && hasFields(['role', 'content', 'createdAt'])
+          && request.resource.data.role in ['user', 'assistant']
+          && request.resource.data.content is string
+          && request.resource.data.content.size() > 0
+          && request.resource.data.content.size() <= 100000;
+
+        // Messages are immutable once written; no client-side edits/deletes
+        allow update, delete: if false;
+      }
+    }
+
+    // ── Deny everything else ──────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
