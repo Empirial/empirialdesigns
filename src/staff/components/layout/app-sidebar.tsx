@@ -15,6 +15,7 @@ import {
   Upload,
   Users,
   MessageSquare,
+  UserCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -67,6 +68,7 @@ const AGENT_NAV: NavItem[] = [
   { title: "AI Assistant", to: "/agent/assistant", icon: Bot },
   { title: "Services", to: "/agent/services", icon: Package },
   { title: "Performance", to: "/agent/performance", icon: Gauge },
+  { title: "My Profile", to: "/agent/profile", icon: UserCircle },
 ];
 
 export function AppSidebar() {

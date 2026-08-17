@@ -90,6 +90,12 @@ export interface Agent {
   callsToday: number;
   callsThisWeek: number[];
   online?: boolean;
+  // Payout banking details — self-service, set from the agent's own
+  // profile page (agent.profile.tsx). See firestore.rules' agents/{agentId}
+  // update rule for the exact self-editable field list.
+  bankName?: string;
+  accountNumber?: string;
+  branchCode?: string;
 }
 
 export interface Service {

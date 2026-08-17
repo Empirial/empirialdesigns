@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { Plus, Search, Upload, Download, X, MoreHorizontal, Trash2, UserPlus, Eye, Pencil } from "lucide-react";
+import { Plus, Search, Upload, Download, X, MoreHorizontal, Trash2, UserPlus, Eye, Pencil, CheckCircle2 } from "lucide-react";
 import { AppShell } from "@staff/components/layout/app-shell";
 import { PageHeader } from "@staff/components/shared/page-header";
 import { EmptyState } from "@staff/components/shared/empty-state";
@@ -58,7 +58,7 @@ import {
 } from "@staff/components/ui/dialog";
 import { useAgents } from "@staff/lib/agents-data";
 import { useServices } from "@staff/lib/services-data";
-import { createLead, invalidateLeadQueries, useLeads } from "@staff/lib/leads";
+import { createLead, invalidateLeadQueries, updateOwnLeadStatus, useLeads } from "@staff/lib/leads";
 import { callBulkAssignLeads, callBulkDeleteLeads, callBulkSetLeadStatus } from "@staff/lib/functions";
 import { firebaseAuth } from "@staff/lib/auth";
 import { db } from "@staff/lib/firebase";
@@ -110,6 +110,7 @@ function PageAdminLeads() {
   const [bulkStatusPending, setBulkStatusPending] = useState(false);
   const [assignDialogPending, setAssignDialogPending] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
+  const [closingId, setClosingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -284,6 +285,25 @@ function PageAdminLeads() {
       updatedBy: uid,
     });
     invalidateLeadQueries(queryClient, editLead.id);
+  };
+
+  // Admin-only: closing a lead is deliberately not exposed to agents (see
+  // agent.leads.$id.tsx's QUICK_STATUS_OPTIONS) — an agent closing a deal
+  // goes through the real Log Call → Closed Won flow with a service/value,
+  // which creates the actual deal/commission record. This direct status
+  // flip is for admin cleanup/override use (e.g. a deal closed offline),
+  // and intentionally does not create a deal or commission of its own.
+  const handleMarkClosedClient = async (lead: Lead) => {
+    setClosingId(lead.id);
+    try {
+      await updateOwnLeadStatus(lead.id, "Closed Won");
+      invalidateLeadQueries(queryClient, lead.id);
+      toast.success(`${lead.business} marked as closed`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't close that lead — try again.");
+    } finally {
+      setClosingId(null);
+    }
   };
 
   return (
@@ -528,6 +548,15 @@ function PageAdminLeads() {
                               >
                                 <UserPlus className="mr-2 size-4" /> Assign
                               </DropdownMenuItem>
+                              {lead.status !== "Closed Won" && lead.status !== "Closed Lost" ? (
+                                <DropdownMenuItem
+                                  disabled={closingId === lead.id}
+                                  onClick={() => handleMarkClosedClient(lead)}
+                                >
+                                  <CheckCircle2 className="mr-2 size-4" />
+                                  {closingId === lead.id ? "Closing…" : "Mark as Closed Client"}
+                                </DropdownMenuItem>
+                              ) : null}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget([lead.id])}>
                                 <Trash2 className="mr-2 size-4" /> Delete

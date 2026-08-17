@@ -354,6 +354,17 @@ function AgentProfile({ agent }: { agent: Agent }) {
                 </div>
               </SectionCard>
             </div>
+            <SectionCard title="Payout banking details" description="Set by the agent from their own profile page">
+              {agent.bankName || agent.accountNumber || agent.branchCode ? (
+                <div className="space-y-3">
+                  <StatRow label="Bank" value={agent.bankName || "—"} />
+                  <StatRow label="Account number" value={agent.accountNumber || "—"} />
+                  <StatRow label="Branch code" value={agent.branchCode || "—"} />
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">This agent hasn't added their banking details yet.</p>
+              )}
+            </SectionCard>
             <SectionCard title="Recent activity" noPadding>
               <div className="p-5">
                 {activityItems.length > 0 ? (

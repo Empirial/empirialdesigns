@@ -28,6 +28,7 @@ import { Route as AgentDashboardRouteImport } from './routes/agent.dashboard'
 import { Route as AgentFollowUpsRouteImport } from './routes/agent.follow-ups'
 import { Route as AgentMessagesRouteImport } from './routes/agent.messages'
 import { Route as AgentPerformanceRouteImport } from './routes/agent.performance'
+import { Route as AgentProfileRouteImport } from './routes/agent.profile'
 import { Route as AgentScriptsRouteImport } from './routes/agent.scripts'
 import { Route as AgentServicesRouteImport } from './routes/agent.services'
 import { Route as AdminAgentsIndexRouteImport } from './routes/admin.agents.index'
@@ -130,6 +131,11 @@ const AgentPerformanceRoute = AgentPerformanceRouteImport.update({
   path: '/performance',
   getParentRoute: () => AgentRoute,
 } as any)
+const AgentProfileRoute = AgentProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AgentRoute,
+} as any)
 const AgentScriptsRoute = AgentScriptsRouteImport.update({
   id: '/scripts',
   path: '/scripts',
@@ -181,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/agent/follow-ups': typeof AgentFollowUpsRoute
   '/agent/messages': typeof AgentMessagesRoute
   '/agent/performance': typeof AgentPerformanceRoute
+  '/agent/profile': typeof AgentProfileRoute
   '/agent/scripts': typeof AgentScriptsRoute
   '/agent/services': typeof AgentServicesRoute
   '/admin/agents/$id': typeof AdminAgentsIdRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByTo {
   '/agent/follow-ups': typeof AgentFollowUpsRoute
   '/agent/messages': typeof AgentMessagesRoute
   '/agent/performance': typeof AgentPerformanceRoute
+  '/agent/profile': typeof AgentProfileRoute
   '/agent/scripts': typeof AgentScriptsRoute
   '/agent/services': typeof AgentServicesRoute
   '/admin/agents/$id': typeof AdminAgentsIdRoute
@@ -236,6 +244,7 @@ export interface FileRoutesById {
   '/agent/follow-ups': typeof AgentFollowUpsRoute
   '/agent/messages': typeof AgentMessagesRoute
   '/agent/performance': typeof AgentPerformanceRoute
+  '/agent/profile': typeof AgentProfileRoute
   '/agent/scripts': typeof AgentScriptsRoute
   '/agent/services': typeof AgentServicesRoute
   '/admin/agents/$id': typeof AdminAgentsIdRoute
@@ -265,6 +274,7 @@ export interface FileRouteTypes {
     | '/agent/follow-ups'
     | '/agent/messages'
     | '/agent/performance'
+    | '/agent/profile'
     | '/agent/scripts'
     | '/agent/services'
     | '/admin/agents/$id'
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/agent/follow-ups'
     | '/agent/messages'
     | '/agent/performance'
+    | '/agent/profile'
     | '/agent/scripts'
     | '/agent/services'
     | '/admin/agents/$id'
@@ -319,6 +330,7 @@ export interface FileRouteTypes {
     | '/agent/follow-ups'
     | '/agent/messages'
     | '/agent/performance'
+    | '/agent/profile'
     | '/agent/scripts'
     | '/agent/services'
     | '/admin/agents/$id'
@@ -469,6 +481,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentPerformanceRouteImport
       parentRoute: typeof AgentRoute
     }
+    '/agent/profile': {
+      id: '/agent/profile'
+      path: '/profile'
+      fullPath: '/agent/profile'
+      preLoaderRoute: typeof AgentProfileRouteImport
+      parentRoute: typeof AgentRoute
+    }
     '/agent/scripts': {
       id: '/agent/scripts'
       path: '/scripts'
@@ -552,6 +571,7 @@ interface AgentRouteChildren {
   AgentFollowUpsRoute: typeof AgentFollowUpsRoute
   AgentMessagesRoute: typeof AgentMessagesRoute
   AgentPerformanceRoute: typeof AgentPerformanceRoute
+  AgentProfileRoute: typeof AgentProfileRoute
   AgentScriptsRoute: typeof AgentScriptsRoute
   AgentServicesRoute: typeof AgentServicesRoute
   AgentLeadsIdRoute: typeof AgentLeadsIdRoute
@@ -564,6 +584,7 @@ const AgentRouteChildren: AgentRouteChildren = {
   AgentFollowUpsRoute: AgentFollowUpsRoute,
   AgentMessagesRoute: AgentMessagesRoute,
   AgentPerformanceRoute: AgentPerformanceRoute,
+  AgentProfileRoute: AgentProfileRoute,
   AgentScriptsRoute: AgentScriptsRoute,
   AgentServicesRoute: AgentServicesRoute,
   AgentLeadsIdRoute: AgentLeadsIdRoute,

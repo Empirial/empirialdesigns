@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, doc, getDoc, getDocs, Timestamp, type DocumentData } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, Timestamp, updateDoc, type DocumentData } from "firebase/firestore";
 
 import { db } from "./firebase";
-import { getMockStaffProfile } from "./auth";
+import { firebaseAuth, getMockStaffProfile } from "./auth";
 import { agents as mockAgents } from "./mock-data";
 import type { Agent } from "./types";
 
@@ -23,6 +23,9 @@ function mapAgentDoc(id: string, data: DocumentData): Agent {
     callsToday: data.callsToday ?? 0,
     callsThisWeek: data.callsThisWeek ?? [0, 0, 0, 0, 0, 0, 0],
     online: data.online ?? false,
+    bankName: data.bankName ?? undefined,
+    accountNumber: data.accountNumber ?? undefined,
+    branchCode: data.branchCode ?? undefined,
   };
 }
 
@@ -50,4 +53,21 @@ export function useAgentDoc(id: string | undefined) {
     },
     enabled: Boolean(effectiveId),
   });
+}
+
+/**
+ * Direct client write, allowed by firestore.rules for the signed-in agent
+ * on their own agents/{uid} doc only — see the onlyChangedFields(['online',
+ * 'bankName', 'accountNumber', 'branchCode']) grant. Used by the agent's
+ * own Profile page (agent.profile.tsx) to set payout banking details.
+ */
+export async function updateOwnBankingDetails(details: {
+  bankName: string;
+  accountNumber: string;
+  branchCode: string;
+}) {
+  if (getMockStaffProfile()) return;
+  const uid = firebaseAuth.currentUser?.uid;
+  if (!uid) throw new Error("You must be signed in to update your banking details.");
+  await updateDoc(doc(db, "agents", uid), details);
 }

@@ -28,3 +28,4 @@ dist-ssr
 *.tsbuildinfo
 vite.config.ts.timestamp-*
 .claude/settings.local.json
+.tanstack

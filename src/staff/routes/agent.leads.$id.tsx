@@ -60,7 +60,7 @@ import { LeadQuoteBuilder } from "@staff/components/lead-quote-builder";
 import { useScripts } from "@staff/lib/scripts-data";
 import { callLogCall } from "@staff/lib/functions";
 import { firebaseAuth } from "@staff/lib/auth";
-import { LEAD_STATUSES, type LeadStatus } from "@staff/lib/types";
+import type { LeadStatus } from "@staff/lib/types";
 import { formatDate, formatDateTime, formatTime, formatZAR, isOverdue } from "@staff/lib/format";
 import { cn } from "@staff/lib/utils";
 
@@ -84,6 +84,18 @@ const CALL_OUTCOMES: LeadStatus[] = [
   "Proposal Sent",
   "Closed Won",
   "Closed Lost",
+];
+
+// The standalone quick-status dropdown (separate from the Call Outcome
+// flow below, which is what actually creates deals/commissions via
+// logCall()) is deliberately limited to these three, non-terminal states.
+// Closing a lead ("Closed Client" / Closed Won) is an admin-only action —
+// see admin.leads.tsx / admin.pipeline.tsx — not something an agent can
+// set for themselves here.
+const QUICK_STATUS_OPTIONS: { value: LeadStatus; label: string }[] = [
+  { value: "Follow-up", label: "Follow-up" },
+  { value: "Interested", label: "Interested" },
+  { value: "Not Interested", label: "Not Interested" },
 ];
 
 const TIME_SLOTS = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"];
@@ -315,8 +327,8 @@ function PageAgentLeadsId() {
             >
               <SelectTrigger className="mt-2 w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {LEAD_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                {QUICK_STATUS_OPTIONS.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
