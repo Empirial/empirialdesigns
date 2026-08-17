@@ -1,0 +1,671 @@
+<title>AI Builder Engine — Unified Flow</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-2: #eef0f3;
+    --ink: #14171f;
+    --muted: #62697a;
+    --accent: #e8672a;
+    --accent-soft: rgba(232, 103, 42, 0.10);
+    --line: rgba(20, 23, 31, 0.38);
+    --line-soft: rgba(20, 23, 31, 0.16);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0e14;
+      --surface: #11151d;
+      --surface-2: #161b25;
+      --ink: #e7eaf0;
+      --muted: #8891a3;
+      --accent: #ff9452;
+      --accent-soft: rgba(255, 148, 82, 0.14);
+      --line: rgba(231, 234, 240, 0.4);
+      --line-soft: rgba(231, 234, 240, 0.16);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e14; --surface: #11151d; --surface-2: #161b25; --ink: #e7eaf0;
+    --muted: #8891a3; --accent: #ff9452; --accent-soft: rgba(255, 148, 82, 0.14);
+    --line: rgba(231, 234, 240, 0.4); --line-soft: rgba(231, 234, 240, 0.16);
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f6f8; --surface: #ffffff; --surface-2: #eef0f3; --ink: #14171f;
+    --muted: #62697a; --accent: #e8672a; --accent-soft: rgba(232, 103, 42, 0.10);
+    --line: rgba(20, 23, 31, 0.38); --line-soft: rgba(20, 23, 31, 0.16);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  .mono {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+  }
+  main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+  }
+  header.page-head {
+    margin-bottom: 40px;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 4px 10px;
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    margin-bottom: 18px;
+  }
+  .eyebrow .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+  }
+  h1 {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: clamp(24px, 3.4vw, 32px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .thesis {
+    font-size: 16px;
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .thesis b { color: var(--ink); font-weight: 600; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line-soft);
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 32px 0 48px;
+  }
+  .stat {
+    background: var(--surface);
+    padding: 18px 20px;
+  }
+  .stat .label {
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .stat .value {
+    font-size: 18px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .value .accent { color: var(--accent); }
+
+  section.figure-block {
+    margin: 56px 0;
+  }
+  section.figure-block h2 {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 16px;
+  }
+  figure {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 14px;
+    padding: 20px 20px 18px;
+  }
+  .svg-wrap { width: 100%; overflow-x: auto; }
+  svg { display: block; max-width: 100%; height: auto; }
+  figcaption {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line-soft);
+    font-size: 13.5px;
+    color: var(--muted);
+    max-width: 72ch;
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  .node-label { font-size: 13px; font-weight: 600; }
+  .node-sub { font-size: 10.5px; }
+  .edge-label { font-size: 10.5px; }
+
+  ol.phases {
+    list-style: none;
+    counter-reset: phase;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  ol.phases li {
+    counter-increment: phase;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    align-items: start;
+  }
+  ol.phases li::before {
+    content: counter(phase);
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  ol.phases .phase-title { font-weight: 600; margin-bottom: 2px; }
+  ol.phases .phase-detail { font-size: 13.5px; color: var(--muted); }
+
+  .callout {
+    margin-top: 56px;
+    padding: 20px 22px;
+    border: 1px solid var(--line-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    background: var(--accent-soft);
+  }
+  .callout h2 {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 13px; letter-spacing: 0.03em; text-transform: uppercase;
+    color: var(--ink); margin: 0 0 12px;
+  }
+  .callout ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+  .callout li { margin-bottom: 6px; }
+  .callout li:last-child { margin-bottom: 0; }
+
+  footer.doc-foot {
+    margin-top: 48px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  footer.doc-foot code {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    background: var(--surface-2);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .phase-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 28px 0 40px;
+  }
+  .pill-status {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 11px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--line-soft);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .pill-status.done {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .pill-status .n { opacity: 0.7; margin-right: 4px; }
+
+  .phase-tag {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 1px 7px;
+    border-radius: 999px;
+    margin-left: 8px;
+    vertical-align: middle;
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+  }
+  .phase-tag.done { color: var(--accent); border: 1px solid var(--accent); }
+  .phase-tag.paused { color: var(--muted); border: 1px solid var(--line-soft); }
+</style>
+
+<main>
+  <header class="page-head">
+    <span class="eyebrow"><span class="dot"></span>Phases 1–6 shipped · 7 remaining</span>
+    <h1>One engine, two speeds</h1>
+    <p class="thesis">
+      Firestore renders the preview <b>instantly</b> on every AI edit.
+      GitHub receives the <b>durable</b> commit later, in a batch, without the
+      user ever waiting on it.
+    </p>
+  </header>
+
+  <div class="phase-status">
+    <span class="pill-status done"><span class="n">1</span>Firestore schema</span>
+    <span class="pill-status done"><span class="n">2</span>Sync mechanics</span>
+    <span class="pill-status done"><span class="n">3</span>Repoint aiChat</span>
+    <span class="pill-status done"><span class="n">4</span>Wire UI</span>
+    <span class="pill-status done"><span class="n">5</span>Routing</span>
+    <span class="pill-status done"><span class="n">6</span>Ownership checks</span>
+    <span class="pill-status"><span class="n">7</span>Cleanup — not yet</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="label">Engines today</div>
+      <div class="value">3 <span class="accent">→</span> 1</div>
+    </div>
+    <div class="stat">
+      <div class="label">Preview reads from</div>
+      <div class="value">Firestore <span class="accent">only</span></div>
+    </div>
+    <div class="stat">
+      <div class="label">GitHub commit fires on</div>
+      <div class="value">3rd edit · 90s idle · Save</div>
+    </div>
+  </div>
+
+  <section class="figure-block">
+    <h2>Figure 1 — the live edit loop</h2>
+    <figure>
+      <div class="svg-wrap">
+        <svg viewBox="0 0 1280 560" role="img" aria-label="An AI edit writes one file document to Firestore and the preview reads it back immediately; a separate sync trigger, fed by an edit counter, an idle timer, an explicit save, or a five-minute scheduled sweep, batches the current Firestore state into a single GitHub commit without the client waiting on it.">
+          <defs>
+            <marker id="arrowFast" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,0 10,5 0,10" fill="var(--accent)" />
+            </marker>
+            <marker id="arrowSlow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,0 10,5 0,10" fill="currentColor" />
+            </marker>
+          </defs>
+
+          <!-- ===== Top lane: fast / instant path ===== -->
+          <!-- Client node -->
+          <rect x="40" y="60" width="190" height="92" rx="10" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="135" y="98" text-anchor="middle" class="mono node-label" fill="var(--ink)">Builder UI</text>
+          <text x="135" y="118" text-anchor="middle" class="mono node-sub" fill="var(--muted)">user edit / prompt</text>
+          <text x="135" y="134" text-anchor="middle" class="mono node-sub" fill="var(--muted)">renders Sandpack preview</text>
+
+          <!-- aiChat node -->
+          <rect x="330" y="60" width="180" height="92" rx="10" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="420" y="98" text-anchor="middle" class="mono node-label" fill="var(--ink)">aiChat()</text>
+          <text x="420" y="118" text-anchor="middle" class="mono node-sub" fill="var(--muted)">Cloud Function</text>
+          <text x="420" y="134" text-anchor="middle" class="mono node-sub" fill="var(--muted)">parses &lt;file&gt; blocks</text>
+
+          <!-- Firestore files node (hub) -->
+          <rect x="610" y="50" width="220" height="112" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.8"/>
+          <text x="720" y="88" text-anchor="middle" class="mono node-label" fill="var(--ink)">Firestore</text>
+          <text x="720" y="108" text-anchor="middle" class="mono node-sub" fill="var(--muted)">repos/id/files/{path}</text>
+          <text x="720" y="124" text-anchor="middle" class="mono node-sub" fill="var(--muted)">one doc per file</text>
+          <text x="720" y="140" text-anchor="middle" class="mono node-sub" fill="var(--muted)">+ sync_status, pending_count</text>
+
+          <!-- edges: client -> aiChat -> Firestore -->
+          <line x1="230" y1="106" x2="322" y2="106" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrowFast)"/>
+          <text x="276" y="96" text-anchor="middle" class="mono edge-label" fill="var(--accent)">prompt</text>
+
+          <line x1="510" y1="106" x2="602" y2="106" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrowFast)"/>
+          <text x="556" y="96" text-anchor="middle" class="mono edge-label" fill="var(--accent)">write file doc</text>
+
+          <!-- loop back: Firestore -> Client (curved, instant read) -->
+          <path d="M 720 50 C 720 8, 135 8, 135 58" fill="none" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrowFast)"/>
+          <text x="427" y="24" text-anchor="middle" class="mono edge-label" fill="var(--accent)">local read — renders instantly, 0 GitHub calls</text>
+
+          <!-- vertical connector Firestore -> Sync trigger -->
+          <line x1="720" y1="162" x2="720" y2="238" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowSlow)"/>
+          <text x="748" y="204" text-anchor="start" class="mono edge-label" fill="var(--muted)">onWrite trigger</text>
+
+          <!-- ===== Bottom lane: batched / durable path ===== -->
+          <rect x="610" y="244" width="220" height="100" rx="10" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="720" y="278" text-anchor="middle" class="mono node-label" fill="var(--ink)">Sync trigger</text>
+          <text x="720" y="298" text-anchor="middle" class="mono node-sub" fill="var(--muted)">counter + idle timer</text>
+          <text x="720" y="314" text-anchor="middle" class="mono node-sub" fill="var(--muted)">3rd edit · 90s idle · Save</text>
+          <text x="720" y="330" text-anchor="middle" class="mono node-sub" fill="var(--muted)">runs server-side</text>
+
+          <!-- Scheduled sweep node, feeding trigger -->
+          <rect x="330" y="258" width="200" height="72" rx="10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 4"/>
+          <text x="430" y="288" text-anchor="middle" class="mono node-label" fill="var(--ink)">Scheduled sweep</text>
+          <text x="430" y="306" text-anchor="middle" class="mono node-sub" fill="var(--muted)">every 5 min · dirty repos only</text>
+          <line x1="530" y1="294" x2="602" y2="294" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#arrowSlow)"/>
+
+          <!-- syncRepoToGitHub node -->
+          <rect x="900" y="244" width="220" height="100" rx="10" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="1010" y="278" text-anchor="middle" class="mono node-label" fill="var(--ink)">syncRepoToGitHub()</text>
+          <text x="1010" y="298" text-anchor="middle" class="mono node-sub" fill="var(--muted)">reads current file docs</text>
+          <text x="1010" y="314" text-anchor="middle" class="mono node-sub" fill="var(--muted)">blob → tree → commit</text>
+          <text x="1010" y="330" text-anchor="middle" class="mono node-sub" fill="var(--muted)">→ update ref</text>
+
+          <line x1="830" y1="294" x2="892" y2="294" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowSlow)"/>
+          <text x="861" y="284" text-anchor="middle" class="mono edge-label" fill="var(--muted)">fires</text>
+
+          <!-- GitHub node -->
+          <rect x="1010" y="420" width="220" height="100" rx="10" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <text x="1120" y="454" text-anchor="middle" class="mono node-label" fill="var(--ink)">GitHub repo</text>
+          <text x="1120" y="474" text-anchor="middle" class="mono node-sub" fill="var(--muted)">durable source</text>
+          <text x="1120" y="490" text-anchor="middle" class="mono node-sub" fill="var(--muted)">real commit history</text>
+          <text x="1120" y="506" text-anchor="middle" class="mono node-sub" fill="var(--muted)">powers export / deploy</text>
+
+          <line x1="1010" y1="344" x2="1120" y2="412" stroke="currentColor" stroke-width="1.6" marker-end="url(#arrowSlow)"/>
+          <text x="1100" y="390" text-anchor="middle" class="mono edge-label" fill="var(--muted)">commits full tree</text>
+
+          <!-- feedback: GitHub -> Firestore, mark clean -->
+          <path d="M 1010 460 C 850 460, 760 300, 738 168" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 4" marker-end="url(#arrowSlow)"/>
+          <text x="900" y="470" text-anchor="middle" class="mono edge-label" fill="var(--muted)">mark clean + last_synced_at</text>
+        </svg>
+      </div>
+      <figcaption>
+        Every AI edit writes one small file document to Firestore and the preview
+        renders from that read — <b>no GitHub round trip in the typing loop</b>.
+        A separate, server-driven trigger (a counter, an idle timer, an explicit
+        Save, or a five-minute scheduled sweep as backstop) decides when enough
+        has changed to push a real commit. Because git blobs are content-addressed,
+        each sync pushes the <b>full current tree</b>, not a diff — safe to fire
+        more than once for the same state.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="figure-block">
+    <h2>Figure 2 — opening a project (cold start)</h2>
+    <figure>
+      <div class="svg-wrap">
+        <svg viewBox="0 0 1280 300" role="img" aria-label="Opening a project checks the Firestore file cache first and renders from it immediately if present; only when that cache is empty, such as a first open on a new device, does the app fall back to reading the full source tree from GitHub.">
+          <defs>
+            <marker id="arrowFast2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,0 10,5 0,10" fill="var(--accent)" />
+            </marker>
+            <marker id="arrowSlow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,0 10,5 0,10" fill="currentColor" />
+            </marker>
+          </defs>
+
+          <rect x="40" y="90" width="190" height="92" rx="10" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="135" y="128" text-anchor="middle" class="mono node-label" fill="var(--ink)">Builder UI</text>
+          <text x="135" y="148" text-anchor="middle" class="mono node-sub" fill="var(--muted)">opens a project</text>
+
+          <rect x="330" y="90" width="210" height="92" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="435" y="122" text-anchor="middle" class="mono node-label" fill="var(--ink)">Firestore cache</text>
+          <text x="435" y="142" text-anchor="middle" class="mono node-sub" fill="var(--muted)">check files/{path}</text>
+          <text x="435" y="158" text-anchor="middle" class="mono node-sub" fill="var(--muted)">has data from last session?</text>
+
+          <rect x="1040" y="90" width="200" height="92" rx="10" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="1140" y="128" text-anchor="middle" class="mono node-label" fill="var(--ink)">Preview hydrated</text>
+          <text x="1140" y="148" text-anchor="middle" class="mono node-sub" fill="var(--muted)">Sandpack renders</text>
+
+          <line x1="230" y1="136" x2="322" y2="136" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowSlow2)"/>
+
+          <!-- cache hit: straight through, accent, top -->
+          <path d="M 540 118 C 720 90, 900 90, 1032 118" fill="none" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrowFast2)"/>
+          <text x="785" y="82" text-anchor="middle" class="mono edge-label" fill="var(--accent)">cache hit — instant, skips GitHub entirely</text>
+
+          <!-- cache empty: dashed down to GitHub, then to preview -->
+          <rect x="640" y="220" width="200" height="72" rx="10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 4"/>
+          <text x="740" y="250" text-anchor="middle" class="mono node-label" fill="var(--ink)">GitHub · getRepoTree</text>
+          <text x="740" y="268" text-anchor="middle" class="mono node-sub" fill="var(--muted)">recursive tree, up to 50 files</text>
+
+          <path d="M 435 182 C 435 220, 560 256, 632 256" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#arrowSlow2)"/>
+          <text x="500" y="216" text-anchor="middle" class="mono edge-label" fill="var(--muted)">cache empty</text>
+
+          <path d="M 848 256 C 950 256, 1080 210, 1136 182" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#arrowSlow2)"/>
+          <text x="1000" y="288" text-anchor="middle" class="mono edge-label" fill="var(--muted)">hydrate once, re-cache to Firestore</text>
+        </svg>
+      </div>
+      <figcaption>
+        Live preview during an editing session <b>never</b> queries GitHub — this
+        is the only path that does, and only on the first open with no existing
+        cache. Most opens are a same-device continuation and hit the cache line
+        at the top. <b>Now implemented</b>, not just diagrammed:
+        <code class="mono">BuilderPage.tsx</code> takes the dashed path only
+        when the Firestore cache is genuinely empty <i>and</i> the project has
+        a real GitHub repo behind it — the common case (cache hit) pays no
+        extra cost.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="figure-block">
+    <h2>Implementation order</h2>
+    <ol class="phases">
+      <li><div><div class="phase-title">Firestore schema<span class="phase-tag done">done</span></div><div class="phase-detail">Add the <code class="mono">files</code> subcollection and sync-status fields — shape only, no behavior change.</div></div></li>
+      <li><div><div class="phase-title">Sync mechanics<span class="phase-tag done">done</span></div><div class="phase-detail"><code class="mono">syncRepoToGitHub</code>, the onWrite counter trigger, and the scheduled sweep.</div></div></li>
+      <li><div><div class="phase-title">Repoint the functions<span class="phase-tag done">done</span></div><div class="phase-detail"><code class="mono">aiChat</code> now verifies ownership, reconstructs the SSE stream server-side, and writes parsed <code class="mono">&lt;file&gt;</code> blocks to the subcollection. <code class="mono">createWebsite</code> already did this in phase 1.</div></div></li>
+      <li><div><div class="phase-title">Wire the real UI<span class="phase-tag done">done</span></div><div class="phase-detail"><code class="mono">AssistantPanel</code> streams from the real <code class="mono">aiChat</code>; <code class="mono">BuilderPage</code> hydrates from Firestore-then-GitHub. Still missing: a visible <code class="mono">github_sync_status</code>/<code class="mono">pending_edit_count</code> indicator in the topbar.</div></div></li>
+      <li><div><div class="phase-title">Fix routing<span class="phase-tag done">done</span></div><div class="phase-detail"><code class="mono">Platform.tsx</code> routes <code class="mono">/dashboard/editor|preview|publish/:repoId</code> to real projects; <code class="mono">Preview.tsx</code>'s job is functionally superseded by <code class="mono">BuilderPage</code>. The dead <code class="mono">/builder/:projectId</code> redirect in <code class="mono">App.tsx</code> is harmless leftover, not fixed.</div></div></li>
+      <li><div><div class="phase-title">Ownership checks<span class="phase-tag done">done</span></div><div class="phase-detail">Folded into phase 3: a shared <code class="mono">resolveOwnedRepo()</code> now guards <code class="mono">aiChat</code>, <code class="mono">getRepoContents</code>, <code class="mono">getRepoTree</code>, and <code class="mono">requestRepoSync</code>.</div></div></li>
+      <li><div><div class="phase-title">Cleanup<span class="phase-tag paused">not yet</span></div><div class="phase-detail">Delete <code class="mono">RepoManagement.tsx</code>/<code class="mono">Preview.tsx</code>, the legacy <code class="mono">claude.ts</code> / <code class="mono">/api/deepseek</code> path, and the old generator pages; update <code class="mono">CLAUDE.md</code>. Destructive, and still unverified — no working shell to run typecheck/build/dev server yet.</div></div></li>
+    </ol>
+  </section>
+
+  <div class="callout">
+    <h2>Open questions</h2>
+    <ul>
+      <li>Threshold and idle window shipped as 3 edits / 2 minutes — the earlier open questions on those are now just "tell me if you want them tuned," not blocking.</li>
+      <li><b>Resolved:</b> the frontend's <code class="mono">repos.service.ts</code> was writing to a single <code class="mono">vfs</code> field instead of the <code class="mono">files</code> subcollection this engine reads/writes — confirmed by reading the code, then fixed (<code class="mono">getRepoFiles</code>/<code class="mono">saveRepoFiles</code>/<code class="mono">createRepoFromPrompt</code>/<code class="mono">createRepoFromGithubUrl</code>/<code class="mono">deleteRepo</code>). Imported GitHub repos now actually pull their real source via <code class="mono">getRepoTree</code> instead of opening on the starter template.</li>
+      <li><b>Resolved:</b> <code class="mono">createRepoFromTemplate</code>'s placeholder <code class="mono">repo_url</code> (a repo the shared GitHub token couldn't actually push to) is gone — it now follows the same "no real GitHub repo yet" convention as <code class="mono">createRepoFromPrompt</code>. Was unreachable from the UI anyway, confirmed by grep, but fixed since it's exported.</li>
+      <li><code class="mono">SaveButton.tsx</code> now calls <code class="mono">requestRepoSync</code> after saving — previously "Save" only ever wrote to Firestore and never pushed to GitHub on its own.</li>
+      <li>Should export offer "clone the GitHub repo" now that it's reliably current, alongside the existing ZIP download?</li>
+    </ul>
+  </div>
+
+  <section class="figure-block" style="margin-top:72px;padding-top:48px;border-top:1px solid var(--line-soft);">
+    <span class="eyebrow"><span class="dot"></span>Implemented · upstream of everything above</span>
+    <h2 style="font-size:20px;color:var(--ink);text-transform:none;letter-spacing:normal;margin-top:14px;">The agent pipeline — what decides which <code class="mono">&lt;file&gt;</code> blocks get produced</h2>
+    <p class="thesis" style="margin-top:10px;">
+      This sits <b>in front of</b> everything above, not in place of it. Every
+      commit, sync trigger, and Firestore doc on this page still works
+      exactly as drawn — the only thing that changed is what's producing the
+      <code class="mono">&lt;file&gt;</code> blocks that feed all of it: one
+      model call, once, is now a 9-agent pipeline under
+      <code class="mono">functions/agents/</code> — and, a step beyond the
+      original plan, the 6 coders don't write code anymore. See Figure 4.
+    </p>
+  </section>
+
+  <section class="figure-block">
+    <h2>Figure 3 — Request Taker → Goal Setter → Manager → 6 section coders</h2>
+    <figure>
+      <div class="svg-wrap">
+        <svg viewBox="0 0 1280 790" role="img" aria-label="A user request passes through the Request Taker and Goal Setter, both model calls, which decide the affected sections. The Manager, pure orchestration code with no model call, then dispatches to up to six section coders: Hero, About, Services, and Testimonials run in parallel off one shared brief, while Nav and Footer run afterward in sequence because they need the final section manifest. All coder output converges into the same file blocks that feed the existing Firestore and GitHub sync pipeline, unchanged.">
+          <defs>
+            <marker id="arrowAccent3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,0 10,5 0,10" fill="var(--accent)" />
+            </marker>
+            <marker id="arrowNeutral3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,0 10,5 0,10" fill="currentColor" />
+            </marker>
+          </defs>
+
+          <!-- User request -->
+          <rect x="490" y="16" width="300" height="56" rx="10" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <text x="640" y="40" text-anchor="middle" class="mono node-label" fill="var(--ink)">User request</text>
+          <text x="640" y="58" text-anchor="middle" class="mono node-sub" fill="var(--muted)">chat message, or the initial build prompt</text>
+          <line x1="640" y1="72" x2="640" y2="106" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrowAccent3)"/>
+
+          <!-- Request Taker (LLM, accent) -->
+          <rect x="470" y="108" width="340" height="72" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.7"/>
+          <text x="640" y="136" text-anchor="middle" class="mono node-label" fill="var(--ink)">Request Taker</text>
+          <text x="640" y="154" text-anchor="middle" class="mono node-sub" fill="var(--muted)">normalizes input, resolves "it"/"that"</text>
+          <text x="640" y="169" text-anchor="middle" class="mono node-sub" fill="var(--accent)">1 model call</text>
+          <line x1="640" y1="180" x2="640" y2="214" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrowAccent3)"/>
+
+          <!-- Goal Setter (LLM, accent) -->
+          <rect x="450" y="216" width="380" height="80" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.7"/>
+          <text x="640" y="244" text-anchor="middle" class="mono node-label" fill="var(--ink)">Goal Setter</text>
+          <text x="640" y="262" text-anchor="middle" class="mono node-sub" fill="var(--muted)">decides affected_sections + a goal per section</text>
+          <text x="640" y="277" text-anchor="middle" class="mono node-sub" fill="var(--accent)">1 model call</text>
+          <line x1="640" y1="296" x2="640" y2="330" stroke="currentColor" stroke-width="1.6" marker-end="url(#arrowNeutral3)"/>
+
+          <!-- Manager (code only, neutral dashed) -->
+          <rect x="480" y="332" width="320" height="66" rx="10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 4"/>
+          <text x="640" y="354" text-anchor="middle" class="mono node-label" fill="var(--ink)">Manager</text>
+          <text x="640" y="371" text-anchor="middle" class="mono node-sub" fill="var(--muted)">dispatch + wireframe pick — no model call</text>
+          <text x="640" y="385" text-anchor="middle" class="mono node-sub" fill="var(--muted)">random on create · reused on edit</text>
+
+          <!-- Branches down to two groups -->
+          <path d="M 560 398 C 470 398, 380 420, 350 436" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowNeutral3)"/>
+          <path d="M 720 398 C 810 398, 870 420, 870 436" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowNeutral3)"/>
+
+          <!-- Parallel group box -->
+          <rect x="40" y="440" width="620" height="128" rx="10" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 5"/>
+          <text x="350" y="430" text-anchor="middle" class="mono edge-label" fill="var(--muted)">parallel — same brief, no shared context</text>
+
+          <rect x="58" y="462" width="130" height="82" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="123" y="497" text-anchor="middle" class="mono node-label" fill="var(--ink)">Hero</text>
+          <text x="123" y="513" text-anchor="middle" class="mono node-sub" fill="var(--muted)">Hero.tsx</text>
+
+          <rect x="204" y="462" width="130" height="82" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="269" y="497" text-anchor="middle" class="mono node-label" fill="var(--ink)">About</text>
+          <text x="269" y="513" text-anchor="middle" class="mono node-sub" fill="var(--muted)">About.tsx</text>
+
+          <rect x="350" y="462" width="130" height="82" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="415" y="497" text-anchor="middle" class="mono node-label" fill="var(--ink)">Services</text>
+          <text x="415" y="513" text-anchor="middle" class="mono node-sub" fill="var(--muted)">Services.tsx</text>
+
+          <rect x="496" y="462" width="146" height="82" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="569" y="497" text-anchor="middle" class="mono node-label" fill="var(--ink)">Testimonials</text>
+          <text x="569" y="513" text-anchor="middle" class="mono node-sub" fill="var(--muted)">Testimonials.tsx</text>
+
+          <!-- Sequential group box -->
+          <rect x="750" y="440" width="360" height="128" rx="10" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 5"/>
+          <text x="930" y="430" text-anchor="middle" class="mono edge-label" fill="var(--muted)">sequential, last — needs the final section manifest</text>
+
+          <rect x="770" y="462" width="140" height="82" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="840" y="497" text-anchor="middle" class="mono node-label" fill="var(--ink)">Nav</text>
+          <text x="840" y="513" text-anchor="middle" class="mono node-sub" fill="var(--muted)">Navigation.tsx</text>
+
+          <line x1="910" y1="503" x2="948" y2="503" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowNeutral3)"/>
+          <text x="929" y="493" text-anchor="middle" class="mono edge-label" fill="var(--muted)">then</text>
+
+          <rect x="950" y="462" width="140" height="82" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="1020" y="497" text-anchor="middle" class="mono node-label" fill="var(--ink)">Footer</text>
+          <text x="1020" y="513" text-anchor="middle" class="mono node-sub" fill="var(--muted)">Footer.tsx</text>
+
+          <!-- Converge -->
+          <path d="M 350 568 C 350 610, 500 630, 560 646" fill="none" stroke="var(--accent)" stroke-width="1.3" marker-end="url(#arrowAccent3)"/>
+          <path d="M 930 568 C 930 610, 780 630, 720 646" fill="none" stroke="var(--accent)" stroke-width="1.3" marker-end="url(#arrowAccent3)"/>
+
+          <rect x="490" y="650" width="300" height="62" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.7"/>
+          <text x="640" y="676" text-anchor="middle" class="mono node-label" fill="var(--ink)">&lt;file&gt; blocks</text>
+          <text x="640" y="694" text-anchor="middle" class="mono node-sub" fill="var(--muted)">one or more, from whichever coders ran</text>
+
+          <line x1="640" y1="712" x2="640" y2="736" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowNeutral3)"/>
+
+          <rect x="410" y="738" width="460" height="46" rx="10" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          <text x="640" y="766" text-anchor="middle" class="mono node-sub" fill="var(--muted)">→ Figure 1's Firestore write path — unchanged</text>
+        </svg>
+      </div>
+      <figcaption>
+        Boxes in the accent color are model calls; the dashed, plain Manager
+        box is deterministic code with no model call of its own. A fresh
+        build sends all 6 coders; a follow-up edit only wakes the ones the
+        Goal Setter flags — see the dependency table in
+        <code class="mono">docs/MULTI_AGENT_ORCHESTRATION.md</code> for how
+        that gets decided. <b>What each coder box actually does changed</b>
+        since this was first drawn — none of them write
+        <code class="mono">Hero.tsx</code> etc. from scratch anymore. Figure
+        4 below is what's really inside each one. Wherever this pipeline
+        ends, it still ends the same way Figure 1 starts: a set of
+        <code class="mono">&lt;file&gt;</code> blocks handed to the exact
+        same Firestore/GitHub sync machinery described above.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="figure-block">
+    <h2>Figure 4 — inside a coder: wireframe, not code generation</h2>
+    <figure>
+      <div class="svg-wrap">
+        <svg viewBox="0 0 1280 300" role="img" aria-label="The Manager assigns a wireframe number, one to nine, to a section: a fresh random pick on a new build, or the number already on record for an edit. That number selects one of nine real prebuilt template files already on disk for that section. The coder makes one small model call that returns only JSON content for the placeholder tokens that specific template contains, never code. A deterministic step then string replaces every token in the template with that content, producing the final file.">
+          <defs>
+            <marker id="arrowAccent4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,0 10,5 0,10" fill="var(--accent)" />
+            </marker>
+            <marker id="arrowNeutral4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <polygon points="0,0 10,5 0,10" fill="currentColor" />
+            </marker>
+          </defs>
+
+          <!-- Manager: wireframe pick (neutral, code) -->
+          <rect x="40" y="90" width="210" height="100" rx="10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 4"/>
+          <text x="145" y="122" text-anchor="middle" class="mono node-label" fill="var(--ink)">Manager</text>
+          <text x="145" y="140" text-anchor="middle" class="mono node-sub" fill="var(--muted)">assigns wireframe #N (1-9)</text>
+          <text x="145" y="156" text-anchor="middle" class="mono node-sub" fill="var(--muted)">random on create</text>
+          <text x="145" y="171" text-anchor="middle" class="mono node-sub" fill="var(--muted)">reused from manifest on edit</text>
+
+          <line x1="250" y1="140" x2="270" y2="140" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowNeutral4)"/>
+
+          <!-- Template file on disk (neutral) -->
+          <rect x="275" y="90" width="210" height="100" rx="10" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="380" y="122" text-anchor="middle" class="mono node-label" fill="var(--ink)">Template file</text>
+          <text x="380" y="140" text-anchor="middle" class="mono node-sub" fill="var(--muted)">coders/templates/</text>
+          <text x="380" y="156" text-anchor="middle" class="mono node-sub" fill="var(--muted)">&lt;section&gt;/0N.tsx</text>
+          <text x="380" y="171" text-anchor="middle" class="mono node-sub" fill="var(--muted)">real, working code — already on disk</text>
+
+          <line x1="485" y1="140" x2="505" y2="140" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrowNeutral4)"/>
+
+          <!-- Coder: content-only model call (accent) -->
+          <rect x="510" y="90" width="220" height="100" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.7"/>
+          <text x="620" y="118" text-anchor="middle" class="mono node-label" fill="var(--ink)">Coder</text>
+          <text x="620" y="136" text-anchor="middle" class="mono node-sub" fill="var(--muted)">writes JSON content only</text>
+          <text x="620" y="151" text-anchor="middle" class="mono node-sub" fill="var(--muted)">{"{"}"HEADLINE": "...", ...{"}"}</text>
+          <text x="620" y="171" text-anchor="middle" class="mono node-sub" fill="var(--accent)">1 model call — never code</text>
+
+          <line x1="730" y1="140" x2="750" y2="140" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrowAccent4)"/>
+
+          <!-- Stamp: deterministic replace (neutral) -->
+          <rect x="755" y="90" width="220" height="100" rx="10" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="865" y="118" text-anchor="middle" class="mono node-label" fill="var(--ink)">Stamp</text>
+          <text x="865" y="136" text-anchor="middle" class="mono node-sub" fill="var(--muted)">deterministic string replace</text>
+          <text x="865" y="151" text-anchor="middle" class="mono node-sub" fill="var(--muted)">{"{{TOKEN}}"} → value</text>
+          <text x="865" y="171" text-anchor="middle" class="mono node-sub" fill="var(--muted)">no LLM — can't come back broken</text>
+
+          <line x1="975" y1="140" x2="995" y2="140" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrowAccent4)"/>
+
+          <!-- <file> block output (accent) -->
+          <rect x="1000" y="100" width="240" height="80" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.7"/>
+          <text x="1120" y="132" text-anchor="middle" class="mono node-label" fill="var(--ink)">&lt;file&gt; block</text>
+          <text x="1120" y="150" text-anchor="middle" class="mono node-sub" fill="var(--muted)">→ Figure 1's write path</text>
+
+          <!-- Side note: asset tokens -->
+          <rect x="510" y="220" width="465" height="62" rx="8" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 5"/>
+          <text x="742" y="244" text-anchor="middle" class="mono node-sub" fill="var(--muted)">Tokens ending in _URL and COPYRIGHT_YEAR skip the model call —</text>
+          <text x="742" y="260" text-anchor="middle" class="mono node-sub" fill="var(--muted)">placeholder image URL / current year, filled in at the Stamp step directly</text>
+        </svg>
+      </div>
+      <figcaption>
+        54 templates exist total — 9 wireframe variants × 6 sections — at
+        <code class="mono">functions/agents/coders/templates/&lt;section&gt;/01.tsx</code>
+        through <code class="mono">09.tsx</code>, each already using only the
+        project's semantic Tailwind tokens. This is the actual reason a
+        Coder call got cheaper and faster than the original plan assumed:
+        it's asking for a handful of copy fields, not a whole file. See the
+        gallery of what each <code class="mono">WF-##</code> looks like, and
+        <code class="mono">docs/MULTI_AGENT_ORCHESTRATION.md</code>'s
+        "Wireframe layout library" section for the full mechanism.
+      </figcaption>
+    </figure>
+  </section>
+
+  <footer class="doc-foot">
+    Sync engine write-up: <code>docs/AI_BUILDER_ENGINE.md</code> (phases 1–6
+    shipped, 7 open). Agent pipeline + wireframe library write-up:
+    <code>docs/MULTI_AGENT_ORCHESTRATION.md</code> (implemented) — code at
+    <code>functions/agents/</code>, templates at
+    <code>functions/agents/coders/templates/</code>.
+  </footer>
+</main>

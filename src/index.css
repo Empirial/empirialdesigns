@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  color: #1a1a1a;
+  background: #fffdfb;
+
+  /* shadcn/ui theme tokens (hsl(var(--x)) in tailwind.config.ts). These were
+     never defined, so every shadcn primitive that relies on them —
+     Toast, Dialog, Popover, Card, etc. — rendered with a fully transparent
+     background (hsl(var(--background)) with an undefined --background is an
+     invalid color, and an invalid background-color computes to transparent).
+     Tuned to the dashboard's existing near-black/purple dark theme. */
+  --background: 240 10% 4%;
+  --foreground: 0 0% 98%;
+  --card: 240 8% 7%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 8% 7%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 262 83% 62%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 6% 14%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 240 6% 14%;
+  --muted-foreground: 240 5% 65%;
+  --accent: 240 6% 16%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 6% 18%;
+  --input: 240 6% 18%;
+  --ring: 262 83% 62%;
+  --radius: 0.85rem;
+  --sidebar-background: 240 10% 5%;
+  --sidebar-foreground: 0 0% 90%;
+  --sidebar-primary: 262 83% 62%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 240 6% 14%;
+  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar-border: 240 6% 16%;
+  --sidebar-ring: 262 83% 62%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #fffdfb;
+}
+
+#root {
+  min-height: 100vh;
+}

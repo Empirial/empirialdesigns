@@ -1,0 +1,6 @@
+- generic [ref=f6e2]:
+  - region "Notifications (F8)":
+    - list
+  - generic [ref=f6e168]:
+    - paragraph [ref=f6e169]: AI generation needs a real account — mock sessions are for browsing the dashboard and builder UI only. Sign up to build for real.
+    - button "Back to dashboard" [ref=f6e170] [cursor=pointer]

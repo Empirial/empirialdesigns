@@ -1,0 +1,29 @@
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - generic [ref=e5]:
+    - img "EMPIRIAL" [ref=e6]
+    - generic [ref=e7]:
+      - heading "Welcome back" [level=1] [ref=e8]
+      - paragraph [ref=e9]: Sign in to access your workspace
+    - generic [ref=e10]:
+      - button "Sign In" [ref=e11] [cursor=pointer]
+      - button "Sign Up" [ref=e12] [cursor=pointer]
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]: Email
+        - textbox "name@example.com" [ref=e20]
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]: Password
+          - link "Forgot?" [ref=e24] [cursor=pointer]:
+            - /url: "#"
+        - generic [ref=e25]:
+          - textbox "••••••••" [ref=e29]
+          - button "Show password" [ref=e30] [cursor=pointer]
+      - button "Please wait…" [disabled] [ref=e50]
+    - generic [ref=e36]: or
+    - generic [ref=e41]:
+      - button "Sign in with Google" [disabled] [ref=e42]
+      - button "🚀 Instant Mock Login" [disabled] [ref=e48]
+      - button "Auto-fill Demo Credentials" [ref=e49] [cursor=pointer]

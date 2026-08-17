@@ -1,0 +1,117 @@
+- generic [ref=f6e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=f6e3]:
+    - banner [ref=f6e4]:
+      - navigation [ref=f6e5]:
+        - link "EMPIRIAL home" [ref=f6e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f6e7]: E
+          - generic [ref=f6e10]: EMPIRIAL
+        - generic [ref=f6e11]:
+          - link "Services" [ref=f6e12] [cursor=pointer]:
+            - /url: /services
+          - link "Portfolio" [ref=f6e13] [cursor=pointer]:
+            - /url: /portfolio
+          - link "About" [ref=f6e14] [cursor=pointer]:
+            - /url: /about
+          - link "Contact" [ref=f6e15] [cursor=pointer]:
+            - /url: /contact
+          - link "Sign In" [ref=f6e16] [cursor=pointer]:
+            - /url: /auth
+    - main [ref=f6e19]:
+      - generic [ref=f6e21]:
+        - paragraph [ref=f6e22]: Capabilities
+        - heading "Digital solutions built for ambitious businesses." [level=1] [ref=f6e23]
+        - paragraph [ref=f6e24]: From your first landing page to the systems that run your growth, EMPIRIAL brings strategy, design, and technology together.
+      - generic [ref=f6e26]:
+        - generic [ref=f6e27]:
+          - generic [ref=f6e33]:
+            - paragraph [ref=f6e34]: "01"
+            - heading "Website Design & Development" [level=2] [ref=f6e35]
+            - paragraph [ref=f6e36]: High-performing websites, landing pages, e-commerce, booking systems, and SEO-ready builds.
+          - link "Discuss this" [ref=f6e37] [cursor=pointer]:
+            - /url: /contact
+        - generic [ref=f6e40]:
+          - generic [ref=f6e46]:
+            - paragraph [ref=f6e47]: "02"
+            - heading "Mobile Apps" [level=2] [ref=f6e48]
+            - paragraph [ref=f6e49]: Android, iOS, and cross-platform products with thoughtful dashboards and smooth experiences.
+          - link "Discuss this" [ref=f6e50] [cursor=pointer]:
+            - /url: /contact
+        - generic [ref=f6e53]:
+          - generic [ref=f6e58]:
+            - paragraph [ref=f6e59]: "03"
+            - heading "AI Automation" [level=2] [ref=f6e60]
+            - paragraph [ref=f6e61]: Chatbots, WhatsApp AI, CRM workflows, and smart systems that save time and scale.
+          - link "Discuss this" [ref=f6e62] [cursor=pointer]:
+            - /url: /contact
+        - generic [ref=f6e65]:
+          - generic [ref=f6e73]:
+            - paragraph [ref=f6e74]: "04"
+            - heading "Branding & Visual Identity" [level=2] [ref=f6e75]
+            - paragraph [ref=f6e76]: Distinctive logos, brand systems, campaigns, posters, and social content built to be remembered.
+          - link "Discuss this" [ref=f6e77] [cursor=pointer]:
+            - /url: /contact
+        - generic [ref=f6e80]:
+          - generic [ref=f6e87]:
+            - paragraph [ref=f6e88]: "05"
+            - heading "Growth & Optimisation" [level=2] [ref=f6e89]
+            - paragraph [ref=f6e90]: SEO, analytics, Google Business, and conversion improvements that turn attention into action.
+          - link "Discuss this" [ref=f6e91] [cursor=pointer]:
+            - /url: /contact
+      - generic [ref=f6e94]:
+        - paragraph [ref=f6e95]: Our approach
+        - generic [ref=f6e96]:
+          - heading "Strategy. Design. Build. Scale." [level=2] [ref=f6e97]
+          - generic [ref=f6e98]:
+            - generic [ref=f6e99]:
+              - text: "01"
+              - heading "Discover" [level=3] [ref=f6e100]
+              - paragraph [ref=f6e101]: We learn your goals, audience, and opportunity.
+            - generic [ref=f6e102]:
+              - text: "02"
+              - heading "Design" [level=3] [ref=f6e103]
+              - paragraph [ref=f6e104]: We shape the right experience and visual system.
+            - generic [ref=f6e105]:
+              - text: "03"
+              - heading "Build" [level=3] [ref=f6e106]
+              - paragraph [ref=f6e107]: We create clean, fast, robust digital products.
+            - generic [ref=f6e108]:
+              - text: "04"
+              - heading "Scale" [level=3] [ref=f6e109]
+              - paragraph [ref=f6e110]: We launch, optimise, and help you grow.
+    - contentinfo [ref=f6e111]:
+      - generic [ref=f6e112]:
+        - generic [ref=f6e113]:
+          - link "EMPIRIAL home" [ref=f6e114] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f6e115]: E
+            - generic [ref=f6e118]: EMPIRIAL
+          - paragraph [ref=f6e119]: Intelligent digital solutions that move ambitious businesses forward.
+        - generic [ref=f6e120]:
+          - paragraph [ref=f6e121]: Explore
+          - generic [ref=f6e122]:
+            - link "Services" [ref=f6e123] [cursor=pointer]:
+              - /url: /services
+            - link "Portfolio" [ref=f6e124] [cursor=pointer]:
+              - /url: /portfolio
+            - link "About" [ref=f6e125] [cursor=pointer]:
+              - /url: /about
+            - link "Contact" [ref=f6e126] [cursor=pointer]:
+              - /url: /contact
+        - generic [ref=f6e127]:
+          - paragraph [ref=f6e128]: Capabilities
+          - generic [ref=f6e129]:
+            - generic [ref=f6e130]: Web & apps
+            - generic [ref=f6e131]: AI automation
+            - generic [ref=f6e132]: Brand systems
+            - generic [ref=f6e133]: Growth
+        - generic [ref=f6e134]:
+          - paragraph [ref=f6e135]: Start a conversation
+          - paragraph [ref=f6e136]: hello@empirialdesigns.com
+          - paragraph [ref=f6e137]: Polokwane, South Africa
+          - link "WhatsApp us" [ref=f6e138] [cursor=pointer]:
+            - /url: https://wa.me/27651859143
+      - generic [ref=f6e141]: © 2026 EMPIRIAL. All rights reserved.

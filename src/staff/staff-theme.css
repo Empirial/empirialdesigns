@@ -1,0 +1,177 @@
+/*
+ * Staff/CRM portal design system — "Meridian CRM".
+ * Ink navy surfaces, emerald-teal accent, generous radii, soft elevation.
+ *
+ * Ported from the original Tailwind v4 styles.css (oklch tokens under
+ * :root/.dark) down to plain Tailwind v3 + bare HSL triplets, scoped under
+ * .staff-theme instead of :root so it can never leak into (or be leaked
+ * into by) the main site's own theme — the two apps share one Tailwind
+ * config/build but must not share one global color scope. See
+ * docs/CRM_STAFF_PORTAL.md. Only imported by src/staff/StaffPortal.tsx,
+ * never loaded on non-/staff pages.
+ *
+ * Values are `H S% L%` triplets (no hsl() wrapper) specifically so they
+ * plug into the *existing* shared tailwind.config.ts color mapping
+ * (`primary: { DEFAULT: 'hsl(var(--primary))' }` etc.) unchanged — that
+ * mapping already used shadcn's standard variable names, which this app
+ * also happens to use, so no tailwind.config.ts changes were needed for
+ * colors. Converted with scripts/oklch-to-hsl (one-off, not checked in).
+ */
+
+.staff-theme,
+:root.staff-portal-active {
+  --radius: 0.75rem;
+
+  --background: 211.2 50.5% 98.2%;
+  --foreground: 215.8 42.0% 10.5%;
+  --surface: 211.2 31.3% 95.7%;
+
+  --card: 0.0 0.0% 100.0%;
+  --card-foreground: 215.8 42.0% 10.5%;
+  --popover: 0.0 0.0% 100.0%;
+  --popover-foreground: 215.8 42.0% 10.5%;
+
+  --primary: 177.6 100.0% 26.7%;
+  --primary-foreground: 174.0 52.4% 98.2%;
+  --primary-soft: 174.5 59.9% 90.6%;
+
+  --secondary: 211.2 32.5% 94.4%;
+  --secondary-foreground: 215.8 25.2% 19.1%;
+
+  --muted: 211.2 28.7% 95.3%;
+  --muted-foreground: 214.5 8.7% 43.1%;
+
+  --accent: 174.4 52.4% 91.1%;
+  --accent-foreground: 180.3 100.0% 13.7%;
+
+  --destructive: 358.4 66.8% 51.8%;
+  --destructive-foreground: 211.2 79.4% 98.9%;
+  --success: 148.6 61.1% 38.5%;
+  --success-foreground: 211.2 79.4% 98.9%;
+  --warning: 35.3 81.6% 54.0%;
+  --warning-foreground: 33.9 89.0% 10.1%;
+  --info: 213.1 61.6% 53.6%;
+  --info-foreground: 211.2 79.4% 98.9%;
+
+  --border: 211.1 16.6% 89.2%;
+  --input: 211.1 17.7% 87.4%;
+  --ring: 177.6 100.0% 26.7%;
+
+  --chart-1: 177.6 100.0% 26.7%;
+  --chart-2: 148.6 61.1% 38.5%;
+  --chart-3: 213.1 61.6% 53.6%;
+  --chart-4: 35.3 81.6% 54.0%;
+  --chart-5: 288.9 41.0% 54.5%;
+
+  /* Tailwind maps bg-sidebar to --sidebar-background. */
+  --sidebar-background: 211.2 50.5% 98.2%;
+  --sidebar-foreground: 215.8 28.0% 31.0%;
+  --sidebar-primary: 177.6 100.0% 26.7%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 215.8 39.6% 16.0%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 211.1 16.6% 87.0%;
+  --sidebar-ring: 177.6 100.0% 30.7%;
+
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-card: 0 1px 2px 0 oklch(0.2 0.03 250 / 0.04), 0 1px 3px 0 oklch(0.2 0.03 250 / 0.06);
+  --shadow-elevated:
+    0 10px 30px -12px oklch(0.2 0.03 250 / 0.16), 0 2px 8px -2px oklch(0.2 0.03 250 / 0.06);
+  --shadow-glow: 0 12px 32px -14px color-mix(in oklab, hsl(var(--primary)) 55%, transparent);
+
+  font-family: var(--font-sans);
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--background));
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Dark mode intentionally reuses the main marketing site's own dark tokens
+ * (src/index.css :root — near-black neutrals + violet primary), not an
+ * independently-invented teal/navy palette like the light theme above. The
+ * ask was specifically "switch to colors similar to the marketing/landing
+ * page" — these are that page's literal --background/--primary/etc. values.
+ */
+.staff-theme.dark,
+.dark .staff-theme,
+:root.staff-portal-active.dark {
+  --background: 240 10% 4%;
+  --foreground: 0 0% 98%;
+  --surface: 240 9% 6%;
+  --card: 240 8% 7%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 8% 7%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 262 83% 62%;
+  --primary-foreground: 0 0% 100%;
+  --primary-soft: 262 55% 16%;
+  --secondary: 240 6% 14%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 240 6% 14%;
+  --muted-foreground: 240 5% 65%;
+  --accent: 262 38% 16%;
+  --accent-foreground: 262 55% 88%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --success: 146.3 47.4% 47.1%;
+  --success-foreground: 141.8 56.2% 5.4%;
+  --warning: 33.9 87.9% 62.0%;
+  --warning-foreground: 31.6 100.0% 8.0%;
+  --info: 213.5 73.8% 63.7%;
+  --info-foreground: 213.7 57.6% 7.6%;
+  --border: 240 6% 18%;
+  --input: 240 6% 18%;
+  --ring: 262 83% 62%;
+  --sidebar-background: 240 10% 5%;
+  --sidebar-foreground: 0 0% 90%;
+  --sidebar-primary: 262 83% 62%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 240 6% 14%;
+  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar-border: 240 6% 16%;
+  --sidebar-ring: 262 83% 62%;
+}
+
+.staff-theme h1,
+.staff-theme h2,
+.staff-theme h3,
+.staff-theme h4,
+.staff-theme h5 {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+.staff-theme .text-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.staff-theme .surface-card {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.85rem; /* ~ --radius + 4px, Tailwind's stock rounded-xl */
+  box-shadow: var(--shadow-card);
+}
+
+.staff-theme .gradient-brand {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklab, hsl(var(--primary)) 92%, black),
+    hsl(var(--primary)) 45%,
+    color-mix(in oklab, hsl(var(--primary)) 62%, oklch(0.65 0.14 255))
+  );
+}
+
+.staff-theme .scrollbar-slim::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.staff-theme .scrollbar-slim::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, hsl(var(--muted-foreground)) 30%, transparent);
+  border-radius: 999px;
+}
+.staff-theme .scrollbar-slim::-webkit-scrollbar-track {
+  background: transparent;
+}

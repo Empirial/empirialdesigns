@@ -1,0 +1,313 @@
+rules_version = '2';
+
+// Two surfaces share this project:
+//  - AI builder (customer-facing): users/, user_repos/ and its subcollections.
+//    Matches the client data model in src/features/repositories/lib/repos.service.ts
+//    and src/features/auth/pages/Auth.tsx.
+//  - Staff/CRM portal (internal, /staff): staffUsers/, agents/, leads/, deals/,
+//    followUps/, services/, scripts/, auditLog/, callLogs/, notifications/, meta/.
+//    Ported from CRM/firestore.rules — see docs/CRM_STAFF_PORTAL.md. Named
+//    staffUsers (not users) specifically to avoid colliding with the AI
+//    builder's own unrelated users/{uid} collection above.
+// Cloud Functions (functions/index.js, functions/src/**) use the Admin SDK
+// and are not subject to these rules — this only governs direct client access.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------------
+    // AI builder (customer-facing)
+    // ---------------------------------------------------------------------
+
+    // Signup writes users/{uid} with the caller's own profile; only that
+    // user may read or write their own doc.
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // A project's owner is stored in user_id (see repos.service.ts toRepo()).
+    // list queries (listUserRepos) always filter where('user_id','==', callerUid),
+    // so this rule provably covers every result Firestore would return.
+    match /user_repos/{repoId} {
+      allow read, update, delete: if request.auth != null
+        && request.auth.uid == resource.data.user_id;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.user_id;
+
+      // File docs don't carry user_id themselves — resolve ownership through
+      // the parent project doc instead. createRepoFromPrompt/Template write
+      // the parent doc and its first file docs in one atomic batch, so a
+      // plain get() here (which only sees pre-batch state) would find no
+      // parent doc yet and deny the whole batch. getAfter() resolves against
+      // the state once every write in the same batch/transaction has
+      // applied, which is exactly this case.
+      match /files/{fileId} {
+        allow read: if request.auth != null
+          && request.auth.uid == get(/databases/$(database)/documents/user_repos/$(repoId)).data.user_id;
+        allow write: if request.auth != null
+          && request.auth.uid == getAfter(/databases/$(database)/documents/user_repos/$(repoId)).data.user_id;
+      }
+
+      // Chat transcript docs, same ownership model as files above — see
+      // repos.service.ts's getChatHistory/appendChatMessages.
+      match /chat_messages/{messageId} {
+        allow read: if request.auth != null
+          && request.auth.uid == get(/databases/$(database)/documents/user_repos/$(repoId)).data.user_id;
+        allow write: if request.auth != null
+          && request.auth.uid == getAfter(/databases/$(database)/documents/user_repos/$(repoId)).data.user_id;
+      }
+
+      // Generated-image asset records — written only by the generateImage
+      // Cloud Function (Admin SDK, bypasses these rules); clients only ever
+      // read their own project's assets. See functions/index.js's
+      // generateImage and PDF section 28's ProjectAsset shape.
+      match /assets/{assetId} {
+        allow read: if request.auth != null
+          && request.auth.uid == get(/databases/$(database)/documents/user_repos/$(repoId)).data.user_id;
+        allow write: if false;
+      }
+    }
+
+    // One doc per user, holding their Google OAuth tokens for the Search
+    // Console integration (functions/integrations/google/oauth.js). Entirely
+    // Cloud-Functions-owned (Admin SDK writes bypass these rules) — a client
+    // must never read or write its own access/refresh tokens directly.
+    match /google_integrations/{uid} {
+      allow read, write: if false;
+    }
+
+    // One-time OAuth CSRF-state docs (functions/index.js's googleConnect/
+    // googleCallback) — created and consumed entirely server-side; a client
+    // has no legitimate reason to read or write one directly.
+    match /oauth_states/{stateId} {
+      allow read, write: if false;
+    }
+
+    // Per-user rate-limit counters (functions/index.js's checkRateLimit) —
+    // entirely server-managed; a client reading or writing its own counter
+    // directly would defeat the point of it.
+    match /rate_limits/{counterId} {
+      allow read, write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Staff/CRM portal (internal, served at /staff)
+    // Phase 1-5 rules ported from CRM/firestore.rules — see
+    // docs/CRM_STAFF_PORTAL.md for the full architecture. Only staffUsers/,
+    // agents/, leads/, deals/, followUps/, services/, scripts/, auditLog/,
+    // callLogs/, notifications/, and meta/public are real; everything else
+    // stays closed until its own phase adds it.
+    // ---------------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Role comes from the custom claim on the ID token (set by the
+    // onUserCreate Cloud Function), never from a client-writable field.
+    function isStaffAdmin() {
+      return isSignedIn() && request.auth.token.role == 'admin';
+    }
+
+    // A single publicly-readable flag the CRM login page uses to decide
+    // whether to show "set up admin account" vs "sign in". Written only by
+    // the onUserCreate Cloud Function (Admin SDK writes bypass these rules).
+    match /meta/public {
+      allow get: if true;
+      allow write: if false;
+    }
+
+    // Every staff user (admin or agent) has exactly one doc here, id == uid.
+    // Anyone signed in may read their own doc unconditionally — this is what
+    // lets the route guard check "do I have an account yet" without racing
+    // the custom claim, which can lag a second or two behind the Firestore
+    // write that creates this doc. Admins may read everyone's.
+    // No client writes: only the onUserCreate/inviteUser/changeUserRole/
+    // removeUser Cloud Functions write here.
+    match /staffUsers/{uid} {
+      allow get: if isSignedIn() && (request.auth.uid == uid || isStaffAdmin());
+      allow list: if isStaffAdmin();
+      allow write: if false;
+    }
+
+    // Operational agent profile, id == uid.
+    match /agents/{agentId} {
+      allow get: if isSignedIn() && (request.auth.uid == agentId || isStaffAdmin());
+      allow list: if isStaffAdmin();
+      // An agent may flip their own live call-availability flag — the
+      // online/offline switch on their dashboard — and nothing else on
+      // this doc; every other field (target, role, callsToday, ...) stays
+      // Cloud-Functions-owned. isOwnLead-style self-only, onlyChangedFields-
+      // gated, same pattern as leads/followUps/scripts/notifications below.
+      allow update: if isSignedIn() && request.auth.uid == agentId && onlyChangedFields(['online']);
+      allow write: if false;
+    }
+
+    // True document deletes are never allowed anywhere below — "delete" in
+    // the CRM (leads, etc.) is always a soft-delete, i.e. an update that
+    // sets a deletedAt/status field, written by an admin or a Cloud
+    // Function. This keeps deal/commission history traceable back to a
+    // lead that a client can't make disappear outright.
+
+    function isOwnLead(leadId) {
+      return get(/databases/$(database)/documents/leads/$(leadId)).data.assignedAgentUid
+        == request.auth.uid;
+    }
+
+    function onlyChangedFields(allowedFields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
+    }
+
+    // Row-level security lives here: an agent may only read/touch leads
+    // assigned to them; admins read/write everything.
+    match /leads/{leadId} {
+      // `list` (i.e. a query like useMyLeads()'s `where assignedAgentUid == uid`)
+      // must use the SAME condition as `get`, not admin-only — Firestore
+      // evaluates this per-candidate-document for list requests too, which
+      // is exactly what makes an agent's own-leads query return only their
+      // leads.
+      allow get, list: if isSignedIn() && (isStaffAdmin() || resource.data.assignedAgentUid == request.auth.uid);
+      allow create: if isStaffAdmin();
+      // Admin: full edits (single-lead form). Bulk assign/status-change/
+      // delete are also possible as direct writes under this same rule —
+      // they route through Cloud Functions for atomicity/audit-trail
+      // reasons, not because rules could tell the difference (they can't).
+      // Agent: may only touch their own lead, and only the fields the call
+      // workspace's direct actions (status change, "mark not interested")
+      // are allowed to set — not value, assignedAgentUid, source, etc.
+      allow update: if isStaffAdmin()
+        || (isSignedIn()
+            && resource.data.assignedAgentUid == request.auth.uid
+            && onlyChangedFields([
+              'status', 'lastContact', 'nextFollowUp', 'lostReason',
+              'updatedAt', 'updatedBy',
+            ]));
+      allow delete: if false;
+
+      // Append-only call notes. Read follows the parent lead's read rule;
+      // no client update/delete — notes are never edited once written.
+      match /notes/{noteId} {
+        allow get: if isSignedIn() && (isStaffAdmin() || isOwnLead(leadId));
+        allow list: if isSignedIn() && (isStaffAdmin() || isOwnLead(leadId));
+        allow create: if isStaffAdmin() || (isSignedIn() && isOwnLead(leadId));
+        allow update, delete: if false;
+      }
+
+      // Server-generated timeline entries only — see logCall() and friends
+      // in the Cloud Functions catalog. Never client-writable, so it stays
+      // a trustworthy audit trail of what actually happened to a lead.
+      match /activities/{activityId} {
+        allow get: if isSignedIn() && (isStaffAdmin() || isOwnLead(leadId));
+        allow list: if isSignedIn() && (isStaffAdmin() || isOwnLead(leadId));
+        allow write: if false;
+      }
+    }
+
+    // Commission math must never be client-trusted — deals are entirely
+    // Cloud-Functions-owned (created by logCall(), paymentStatus changed by
+    // setDealPayment()). Clients only ever read.
+    match /deals/{dealId} {
+      allow get, list: if isSignedIn() && (isStaffAdmin() || resource.data.agentUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // Created only by logCall() when a call outcome needs a follow-up.
+    // Completing/rescheduling an existing one is a narrow, same-agent
+    // update — safe as a direct write since it can only touch status/dueAt
+    // on a follow-up the agent already owns.
+    match /followUps/{followUpId} {
+      allow get, list: if isSignedIn() && (isStaffAdmin() || resource.data.agentUid == request.auth.uid);
+      allow create: if false;
+      allow update: if isStaffAdmin()
+        || (isSignedIn()
+            && resource.data.agentUid == request.auth.uid
+            && onlyChangedFields(['status', 'dueAt']));
+      allow delete: if false;
+    }
+
+    // Quotes are entirely Cloud-Functions-owned (created by createQuote(),
+    // which reads each service's real price server-side rather than
+    // trusting a client-sent figure — same principle as deals/commission
+    // above). Clients only ever read their own agent's quotes, or admin
+    // reads all.
+    match /quotes/{quoteId} {
+      allow get, list: if isSignedIn() && (isStaffAdmin() || resource.data.agentUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // Catalog data every signed-in staff user (admin or agent) reads; only
+    // admins maintain it.
+    match /services/{serviceId} {
+      allow get, list: if isSignedIn();
+      allow write: if isStaffAdmin();
+    }
+
+    match /scripts/{scriptId} {
+      allow get, list: if isSignedIn();
+      // Admins manage the script itself; any signed-in staff user may
+      // additionally touch *only* their own membership in favouriteBy (a
+      // per-user uid[] — trusts the client to arrayUnion/arrayRemove just
+      // its own uid, since rules can't cheaply diff array contents
+      // element-by-element).
+      allow update: if isStaffAdmin()
+        || (isSignedIn() && onlyChangedFields(['favouriteBy']));
+      allow create, delete: if isStaffAdmin();
+    }
+
+    // Sales Agent Academy lessons are read by all staff and maintained by
+    // admins. Course uploads replace this collection in one admin batch.
+    match /salesTrainingLessons/{lessonId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isStaffAdmin();
+    }
+
+    // Points at the admin-uploaded certificate background image (Storage
+    // path certificateTemplate/background) shown behind the Sales Agent
+    // Academy completion certificate — see agent.scripts.tsx.
+    match /settings/certificateTemplate {
+      allow get: if isSignedIn();
+      allow write: if isStaffAdmin();
+    }
+
+    // Written only by Cloud Functions (writeAuditLog(), used by every
+    // mutating callable above).
+    match /auditLog/{entryId} {
+      allow get, list: if isStaffAdmin();
+      allow write: if false;
+    }
+
+    // Lightweight per-call records written by logCall() purely so real
+    // calls-per-day / calls-per-agent aggregation is possible without a
+    // collection-group query across every lead's activities subcollection.
+    match /callLogs/{callLogId} {
+      allow get, list: if isSignedIn() && (isStaffAdmin() || resource.data.agentUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // Real per-user notifications — created only by Cloud Functions
+    // reacting to actual events (bulkAssignLeads, setDealPayment, logCall,
+    // the scheduled overdue-follow-up check). The one client write allowed
+    // is a recipient marking their own notification read.
+    match /notifications/{notificationId} {
+      allow get, list: if isSignedIn() && (isStaffAdmin() || resource.data.recipientUid == request.auth.uid);
+      allow create: if false;
+      allow update: if isSignedIn()
+        && resource.data.recipientUid == request.auth.uid
+        && onlyChangedFields(['read']);
+      allow delete: if false;
+    }
+
+    // Private admin-to-agent inbox. Every message is scoped to exactly one
+    // agent; admins can see all threads and an agent can see/write only theirs.
+    match /agentMessages/{messageId} {
+      allow get, list: if isSignedIn() && (isStaffAdmin() || resource.data.agentUid == request.auth.uid);
+      allow create: if isSignedIn() && (isStaffAdmin() || request.resource.data.agentUid == request.auth.uid);
+      allow update, delete: if false;
+    }
+
+    // Deny-by-default: every collection not explicitly listed above stays
+    // fully closed until its own phase defines real rules for it.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

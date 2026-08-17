@@ -1,0 +1,28 @@
+rules_version = '2';
+
+// Matches the ownership model in firestore.rules: every object lives under
+// users/{uid}/... and only that uid may read or write it. generateDocument
+// (functions/index.js) writes via the Admin SDK, which isn't subject to
+// these rules, and hands the client back a signed URL instead of relying on
+// direct client reads — these rules exist so the bucket isn't left wide
+// open by default, not because the app's normal flow depends on them yet.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Single shared certificate background image for the Sales Agent
+    // Academy completion certificate (agent.scripts.tsx). Any signed-in
+    // staff user may read it; only an admin (role custom claim) may upload
+    // a replacement.
+    match /certificateTemplate/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.role == 'admin';
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "functions-staff",
+  "version": "1.0.0",
+  "description": "Cloud Functions for the staff/CRM portal (\"staff\" codebase — see firebase.json). Deployed under the empirialdesigns project, alongside the AI builder's functions/ codebase.",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "firebase-admin": "11.11.1",
+    "firebase-functions": "^6.3.1",
+    "mime": "1.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

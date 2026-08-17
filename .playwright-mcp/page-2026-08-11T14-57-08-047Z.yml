@@ -1,0 +1,74 @@
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - navigation [ref=e5]:
+        - link "EMPIRIAL home" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e7]: E
+          - generic [ref=e10]: EMPIRIAL
+        - generic [ref=e11]:
+          - link "Services" [ref=e12] [cursor=pointer]:
+            - /url: /services
+          - link "Portfolio" [ref=e13] [cursor=pointer]:
+            - /url: /portfolio
+          - link "About" [ref=e14] [cursor=pointer]:
+            - /url: /about
+          - link "Contact" [ref=e15] [cursor=pointer]:
+            - /url: /contact
+          - link "Sign In" [ref=e16] [cursor=pointer]:
+            - /url: /auth
+    - main [ref=e19]:
+      - generic [ref=e24]:
+        - paragraph [ref=e25]: Digital studio · South Africa
+        - heading "What will we build together?" [level=1] [ref=e26]
+        - paragraph [ref=e27]: Tell EMPIRIAL what you are imagining. We turn ambitious ideas into websites, apps, automation, and brands that move businesses forward.
+        - generic [ref=e28]:
+          - textbox "Describe what you want to build" [ref=e29]:
+            - /placeholder: Describe what you want to build...
+          - generic [ref=e30]:
+            - generic [ref=e31]:
+              - button "Add an attachment" [ref=e32] [cursor=pointer]
+              - generic [ref=e34]: Start with an idea
+            - generic [ref=e35]:
+              - button "Use voice input" [ref=e36] [cursor=pointer]
+              - button "Send your idea" [disabled] [ref=e40]
+        - generic [ref=e43]:
+          - button "Build my business a modern website" [ref=e44] [cursor=pointer]
+          - button "Create a brand that feels premium" [ref=e45] [cursor=pointer]
+          - button "Automate my customer enquiries" [ref=e46] [cursor=pointer]
+    - contentinfo [ref=e47]:
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - link "EMPIRIAL home" [ref=e50] [cursor=pointer]:
+            - /url: /
+            - generic [ref=e51]: E
+            - generic [ref=e54]: EMPIRIAL
+          - paragraph [ref=e55]: Intelligent digital solutions that move ambitious businesses forward.
+        - generic [ref=e56]:
+          - paragraph [ref=e57]: Explore
+          - generic [ref=e58]:
+            - link "Services" [ref=e59] [cursor=pointer]:
+              - /url: /services
+            - link "Portfolio" [ref=e60] [cursor=pointer]:
+              - /url: /portfolio
+            - link "About" [ref=e61] [cursor=pointer]:
+              - /url: /about
+            - link "Contact" [ref=e62] [cursor=pointer]:
+              - /url: /contact
+        - generic [ref=e63]:
+          - paragraph [ref=e64]: Capabilities
+          - generic [ref=e65]:
+            - generic [ref=e66]: Web & apps
+            - generic [ref=e67]: AI automation
+            - generic [ref=e68]: Brand systems
+            - generic [ref=e69]: Growth
+        - generic [ref=e70]:
+          - paragraph [ref=e71]: Start a conversation
+          - paragraph [ref=e72]: hello@empirialdesigns.com
+          - paragraph [ref=e73]: Polokwane, South Africa
+          - link "WhatsApp us" [ref=e74] [cursor=pointer]:
+            - /url: https://wa.me/27651859143
+      - generic [ref=e77]: © 2026 EMPIRIAL. All rights reserved.

@@ -1,0 +1,59 @@
+- generic [ref=f6e2]:
+  - region "Notifications (F8)":
+    - list
+  - generic [ref=f6e3]:
+    - complementary [ref=f6e4]:
+      - generic [ref=f6e5]:
+        - link "EMPIRIAL EMPIRIAL AI" [ref=f6e6] [cursor=pointer]:
+          - /url: /dashboard
+          - img "EMPIRIAL" [ref=f6e7]
+          - generic [ref=f6e8]: EMPIRIAL AI
+        - button "Collapse navigation" [ref=f6e9] [cursor=pointer]
+      - navigation "Primary navigation" [ref=f6e13]:
+        - button "Home" [ref=f6e14] [cursor=pointer]
+        - button "Projects" [ref=f6e21] [cursor=pointer]
+        - button "Templates" [ref=f6e25] [cursor=pointer]
+        - button "Assets" [ref=f6e29] [cursor=pointer]
+      - generic [ref=f6e35]: Workspace
+      - navigation [ref=f6e36]:
+        - button "Settings" [ref=f6e37] [cursor=pointer]
+        - button "Help center" [ref=f6e42] [cursor=pointer]
+      - generic [ref=f6e47]:
+        - generic [ref=f6e48]:
+          - generic [ref=f6e49]: 12 credits left
+          - button "Upgrade plan" [ref=f6e53] [cursor=pointer]
+        - button "D Demo Builder demo@empirial.com Sign out" [ref=f6e56] [cursor=pointer]:
+          - generic [ref=f6e57]: D
+          - generic [ref=f6e58]:
+            - generic [ref=f6e59]: Demo Builder
+            - generic [ref=f6e60]: demo@empirial.com
+          - button "Sign out" [ref=f6e61]
+    - main [ref=f6e66]:
+      - generic [ref=f6e67]:
+        - generic [ref=f6e68]:
+          - img "EMPIRIAL" [ref=f6e69]
+          - heading "Let's build something with EMPIRIAL" [level=2] [ref=f6e70]
+          - paragraph [ref=f6e71]: Describe what you want to create — a website, an image, or a document — and watch your idea come to life.
+          - generic [ref=f6e72]:
+            - button "Website" [ref=f6e73] [cursor=pointer]
+            - button "Image" [ref=f6e74] [cursor=pointer]
+            - button "Document" [ref=f6e75] [cursor=pointer]
+          - generic [ref=f6e76]:
+            - textbox "Describe what you want to create" [ref=f6e77]:
+              - /placeholder: Ask EMPIRIAL to build a website that...
+            - generic [ref=f6e78]:
+              - button "Add an attachment" [ref=f6e79] [cursor=pointer]
+              - generic [ref=f6e81]:
+                - button "Use voice input" [ref=f6e82] [cursor=pointer]
+                - button "Create project" [disabled] [ref=f6e86]
+          - generic [ref=f6e89]:
+            - button "Build a website" [ref=f6e90] [cursor=pointer]
+            - button "Generate an image" [ref=f6e91] [cursor=pointer]
+            - button "Make a document" [ref=f6e92] [cursor=pointer]
+        - generic [ref=f6e94]:
+          - generic [ref=f6e95]:
+            - button "Search" [ref=f6e96] [cursor=pointer]
+            - button "My projects" [ref=f6e100] [cursor=pointer]
+            - button "Recently viewed" [ref=f6e101] [cursor=pointer]
+            - button "EMPIRIAL templates" [ref=f6e102] [cursor=pointer]
+          - button "Browse all" [ref=f6e103] [cursor=pointer]

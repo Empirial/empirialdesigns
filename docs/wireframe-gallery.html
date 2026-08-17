@@ -1,0 +1,856 @@
+<title>Wireframe library — pipeline templates</title>
+<style>
+  :root {
+    --paper: #f7f5f0;
+    --paper-raise: #efece4;
+    --ink: #211e1a;
+    --ink-soft: #4a453d;
+    --muted: #8b8578;
+    --line: #c7c2b6;
+    --line-soft: #dcd8cc;
+    --fill: #eae5da;
+    --accent: #2f5d50;
+    --accent-soft: #dbe6e2;
+    --card-bg: #ffffff;
+    --shadow: 0 1px 0 rgba(33, 30, 26, 0.04);
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #16181a;
+    --paper-raise: #1c1f22;
+    --ink: #ece8e0;
+    --ink-soft: #c3beb2;
+    --muted: #8c9290;
+    --line: #3c403d;
+    --line-soft: #2a2d2b;
+    --fill: #24272a;
+    --accent: #6fb09e;
+    --accent-soft: #1f2c28;
+    --card-bg: #1c1f22;
+    --shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #16181a;
+      --paper-raise: #1c1f22;
+      --ink: #ece8e0;
+      --ink-soft: #c3beb2;
+      --muted: #8c9290;
+      --line: #3c403d;
+      --line-soft: #2a2d2b;
+      --fill: #24272a;
+      --accent: #6fb09e;
+      --accent-soft: #1f2c28;
+      --card-bg: #1c1f22;
+      --shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "Inter", "Segoe UI", system-ui, sans-serif;
+    line-height: 1.5;
+  }
+
+  .display {
+    font-family: "Neue Haas Grotesk Display", "Inter Tight", -apple-system, system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .wrap {
+    max-width: 1220px;
+    margin: 0 auto;
+    padding: 4rem 2rem 6rem;
+  }
+
+  /* ---------- Header ---------- */
+
+  .page-head { margin-bottom: 3.5rem; }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1rem;
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 0.5em;
+    height: 0.5em;
+    border: 1px solid currentColor;
+    transform: rotate(45deg);
+  }
+
+  h1 { font-size: clamp(1.7rem, 3vw, 2.3rem); margin: 0 0 0.9rem; }
+
+  .page-head p { max-width: 66ch; color: var(--ink-soft); font-size: 1rem; margin: 0; }
+
+  /* ---------- Legend ---------- */
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.75rem;
+    margin-top: 2rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--line-soft);
+    background: var(--paper-raise);
+    border-radius: 3px;
+  }
+
+  .legend-item { display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; color: var(--ink-soft); }
+
+  .legend-swatch { flex: none; width: 26px; height: 16px; border: 1px solid var(--line); background: var(--fill); }
+  .legend-swatch.is-line { display: flex; align-items: center; justify-content: center; }
+  .legend-swatch.is-line span { width: 70%; height: 3px; background: var(--muted); border-radius: 1px; }
+  .legend-swatch.is-img {
+    background-image:
+      linear-gradient(135deg, transparent 47%, var(--line) 48%, var(--line) 52%, transparent 53%),
+      linear-gradient(45deg, transparent 47%, var(--line) 48%, var(--line) 52%, transparent 53%);
+  }
+  .legend-swatch.is-btn { border-radius: 20px; background: var(--accent-soft); border-color: var(--accent); }
+  .legend-swatch.is-accent { background: var(--accent-soft); border-color: var(--accent); }
+
+  /* ---------- Section block ---------- */
+
+  .section-block { margin-top: 4rem; padding-top: 2.25rem; border-top: 1px solid var(--line-soft); }
+
+  .section-block__head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 0.4rem; }
+
+  .section-index { font-size: 0.78rem; color: var(--muted); }
+
+  .section-block h2 { font-size: 1.3rem; margin: 0; }
+
+  .section-block__file { font-size: 0.76rem; color: var(--muted); margin: 0 0 1.5rem; }
+
+  .nine { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+
+  @media (max-width: 920px) { .nine { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .nine { grid-template-columns: 1fr; } }
+
+  /* ---------- Wireframe card ---------- */
+
+  .wf-card { border: 1px solid var(--line); background: var(--card-bg); box-shadow: var(--shadow); border-radius: 2px; overflow: hidden; }
+
+  .wf-card__head { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line-soft); background: var(--paper-raise); }
+
+  .wf-id { font-size: 0.68rem; color: var(--accent); background: var(--accent-soft); padding: 0.1rem 0.4rem; border-radius: 2px; flex: none; }
+
+  .wf-desc { font-size: 0.74rem; color: var(--ink-soft); line-height: 1.35; }
+
+  .wf-sketch { padding: 0.9rem; min-height: 138px; display: flex; flex-direction: column; justify-content: center; gap: 0.4rem; }
+
+  /* ---------- Sketch primitives ---------- */
+
+  .ln { height: 7px; border-radius: 1px; background: var(--fill); border: 1px solid var(--line); }
+  .ln--thick { height: 11px; }
+  .ln--xs { width: 22%; }
+  .ln--sm { width: 38%; }
+  .ln--md { width: 58%; }
+  .ln--lg { width: 78%; }
+  .ln--full { width: 100%; }
+  .ln--accent { background: var(--accent-soft); border-color: var(--accent); }
+
+  .img-ph {
+    border: 1px solid var(--line);
+    background-color: var(--fill);
+    background-image:
+      linear-gradient(135deg, transparent 47%, var(--line) 48%, var(--line) 52%, transparent 53%),
+      linear-gradient(45deg, transparent 47%, var(--line) 48%, var(--line) 52%, transparent 53%);
+    border-radius: 2px;
+  }
+
+  .btn-ph { height: 18px; width: 60px; border-radius: 20px; background: var(--accent-soft); border: 1px solid var(--accent); flex: none; }
+  .btn-ph--outline { background: transparent; }
+
+  .badge-ph { height: 15px; width: 46px; border-radius: 3px; background: var(--paper-raise); border: 1px solid var(--line); flex: none; }
+
+  .tab-ph { height: 14px; width: 32px; border-radius: 3px; background: var(--paper-raise); border: 1px solid var(--line); flex: none; }
+  .tab-ph.is-active { border-color: var(--accent); background: var(--accent-soft); }
+
+  .dot-ph { width: 6px; height: 6px; border-radius: 50%; background: var(--line); flex: none; }
+  .dot-ph.is-active { background: var(--accent); }
+
+  .avatar-ph { width: 24px; height: 24px; border-radius: 50%; background: var(--fill); border: 1px solid var(--line); flex: none; }
+
+  .icon-ph { width: 20px; height: 20px; border-radius: 6px; background: var(--accent-soft); border: 1px solid var(--accent); flex: none; }
+
+  .row { display: flex; align-items: center; }
+  .col { display: flex; flex-direction: column; }
+  .gap-xs { gap: 0.28rem; }
+  .gap-sm { gap: 0.4rem; }
+  .gap-md { gap: 0.55rem; }
+  .between { justify-content: space-between; }
+  .center { justify-content: center; align-items: center; }
+  .grow { flex: 1; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; align-items: center; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+
+  .stat-block { border: 1px solid var(--line-soft); border-radius: 2px; padding: 0.4rem; text-align: center; }
+  .stat-block .ln { margin: 0 auto; }
+
+  .card-mini { border: 1px solid var(--line-soft); border-radius: 2px; padding: 0.45rem; }
+
+  footer.colophon { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--line-soft); font-size: 0.76rem; color: var(--muted); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .wf-card { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+    .wf-card:hover { border-color: var(--accent); }
+  }
+</style>
+
+<div class="wrap">
+
+  <div class="page-head">
+    <div class="eyebrow">Manager · wireframe library — built</div>
+    <h1 class="display">All 54 layouts, now real code</h1>
+    <p>
+      9 structural options per section × 6 sections. Every one of these sketches now has a
+      matching, working React + TypeScript + Tailwind component at
+      <code class="mono">functions/agents/coders/templates/&lt;section&gt;/01.tsx</code>–<code class="mono">09.tsx</code>.
+      This page stays as the structural reference — what each <code class="mono">WF-##</code> id
+      means — while the real code carries the actual layout, styling, and content placeholders.
+    </p>
+
+    <div class="legend">
+      <div class="legend-item"><span class="legend-swatch is-line"><span></span></span> text line</div>
+      <div class="legend-item"><span class="legend-swatch is-img"></span> image / illustration</div>
+      <div class="legend-item"><span class="legend-swatch is-btn"></span> button / CTA</div>
+      <div class="legend-item"><span class="legend-swatch is-accent" style="border-radius:3px;"></span> emphasized / active</div>
+      <div class="legend-item"><span class="legend-swatch" style="border-radius:50%; width:16px; height:16px;"></span> avatar / icon</div>
+    </div>
+  </div>
+
+  <!-- ============ NAV ============ -->
+  <section class="section-block">
+    <div class="section-block__head"><span class="section-index mono">01</span><h2>Nav</h2></div>
+    <p class="section-block__file mono">src/components/Navigation.tsx</p>
+    <div class="nine">
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-01</span><span class="wf-desc">Logo left, links centered, CTA right</span></header>
+        <div class="wf-sketch">
+          <div class="row between">
+            <div class="ln ln--xs ln--thick"></div>
+            <div class="row gap-md"><div class="ln ln--xs"></div><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+            <div class="btn-ph"></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-02</span><span class="wf-desc">Links beside logo, CTA styled as last link</span></header>
+        <div class="wf-sketch">
+          <div class="row gap-md">
+            <div class="ln ln--xs ln--thick"></div>
+            <div class="ln ln--xs"></div><div class="ln ln--xs"></div>
+            <div class="ln ln--xs ln--accent"></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-03</span><span class="wf-desc">Logo centered, links split evenly either side</span></header>
+        <div class="wf-sketch">
+          <div class="row between">
+            <div class="row gap-sm"><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+            <div class="ln ln--xs ln--thick"></div>
+            <div class="row gap-sm"><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-04</span><span class="wf-desc">Links collapsed behind menu control, CTA visible</span></header>
+        <div class="wf-sketch">
+          <div class="row between">
+            <div class="ln ln--xs ln--thick"></div>
+            <div class="row gap-md">
+              <div class="col gap-xs" style="width:16px;"><div style="height:2px;background:var(--line);"></div><div style="height:2px;background:var(--line);"></div><div style="height:2px;background:var(--line);"></div></div>
+              <div class="btn-ph"></div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-05</span><span class="wf-desc">Slim utility row above main logo+links row</span></header>
+        <div class="wf-sketch col gap-sm">
+          <div class="row gap-sm"><div class="ln ln--xs" style="width:14%;"></div><div class="ln ln--xs" style="width:14%;"></div></div>
+          <div class="row between"><div class="ln ln--xs ln--thick"></div><div class="row gap-md"><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-06</span><span class="wf-desc">Minimal — logo left, single CTA, no link list</span></header>
+        <div class="wf-sketch">
+          <div class="row between"><div class="ln ln--xs ln--thick"></div><div class="btn-ph"></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-07</span><span class="wf-desc">CTA styled as outline button, not filled</span></header>
+        <div class="wf-sketch">
+          <div class="row between">
+            <div class="ln ln--xs ln--thick"></div>
+            <div class="row gap-md"><div class="ln ln--xs"></div><div class="ln ln--xs"></div><div class="btn-ph btn-ph--outline"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-08</span><span class="wf-desc">Two-tier — utility bar, then logo+links+CTA</span></header>
+        <div class="wf-sketch col gap-sm">
+          <div class="row gap-md" style="opacity:0.65;"><div class="ln ln--xs" style="width:16%;"></div><div class="ln ln--xs" style="width:16%;"></div><div class="ln ln--xs" style="width:16%;"></div></div>
+          <div class="row between"><div class="ln ln--xs ln--thick"></div><div class="row gap-md"><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div><div class="btn-ph"></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-09</span><span class="wf-desc">Phone/contact detail shown instead of CTA</span></header>
+        <div class="wf-sketch">
+          <div class="row between">
+            <div class="ln ln--xs ln--thick"></div>
+            <div class="row gap-md"><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+            <div class="ln ln--sm ln--thick ln--accent"></div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ============ HERO ============ -->
+  <section class="section-block">
+    <div class="section-block__head"><span class="section-index mono">02</span><h2>Hero</h2></div>
+    <p class="section-block__file mono">src/components/Hero.tsx</p>
+    <div class="nine">
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-01</span><span class="wf-desc">Centered stack, no image</span></header>
+        <div class="wf-sketch center col gap-sm" style="text-align:center;">
+          <div class="ln ln--xs" style="margin:0 auto;"></div>
+          <div class="ln ln--lg ln--thick" style="margin:0 auto;"></div>
+          <div class="ln ln--md ln--thick" style="margin:0 auto;"></div>
+          <div class="ln ln--sm" style="margin:0 auto;"></div>
+          <div class="btn-ph" style="margin-top:0.3rem;"></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-02</span><span class="wf-desc">Split — text left, image right</span></header>
+        <div class="wf-sketch">
+          <div class="grid-2">
+            <div class="col gap-sm"><div class="ln ln--xs"></div><div class="ln ln--full ln--thick"></div><div class="ln ln--md ln--thick"></div><div class="ln ln--sm"></div><div class="btn-ph"></div></div>
+            <div class="img-ph" style="height:100px;"></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-03</span><span class="wf-desc">Full-bleed background image, headline+CTA overlaid</span></header>
+        <div class="wf-sketch">
+          <div class="img-ph" style="height:128px; display:flex; align-items:center; justify-content:center;">
+            <div class="col gap-sm center" style="background:var(--card-bg); padding:0.5rem 0.8rem; border:1px solid var(--line);">
+              <div class="ln ln--md ln--thick" style="margin:0 auto;"></div>
+              <div class="btn-ph" style="margin:0 auto;"></div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-04</span><span class="wf-desc">Headline top, full-width image below, CTA beneath</span></header>
+        <div class="wf-sketch col gap-sm">
+          <div class="ln ln--full ln--thick" style="margin:0 auto; width:70%;"></div>
+          <div class="img-ph" style="height:60px;"></div>
+          <div class="btn-ph" style="margin:0 auto;"></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-05</span><span class="wf-desc">Centered headline, two CTAs side by side</span></header>
+        <div class="wf-sketch col center gap-sm" style="text-align:center;">
+          <div class="ln ln--lg ln--thick" style="margin:0 auto;"></div>
+          <div class="ln ln--md" style="margin:0 auto;"></div>
+          <div class="row gap-sm center"><div class="btn-ph"></div><div class="btn-ph btn-ph--outline"></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-06</span><span class="wf-desc">Split reversed — image left, text right</span></header>
+        <div class="wf-sketch">
+          <div class="grid-2">
+            <div class="img-ph" style="height:100px;"></div>
+            <div class="col gap-sm"><div class="ln ln--xs"></div><div class="ln ln--full ln--thick"></div><div class="ln ln--md ln--thick"></div><div class="btn-ph"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-07</span><span class="wf-desc">Left-aligned, trust-badge row beneath CTA</span></header>
+        <div class="wf-sketch col gap-sm">
+          <div class="ln ln--lg ln--thick"></div>
+          <div class="ln ln--md"></div>
+          <div class="btn-ph"></div>
+          <div class="row gap-sm" style="margin-top:0.15rem;"><div class="badge-ph"></div><div class="badge-ph"></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-08</span><span class="wf-desc">Headline+CTA in a card, floating over background</span></header>
+        <div class="wf-sketch">
+          <div class="img-ph" style="height:120px; display:flex; align-items:center; justify-content:center;">
+            <div class="card-mini col gap-sm center" style="background:var(--card-bg);"><div class="ln ln--md ln--thick"></div><div class="btn-ph"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-09</span><span class="wf-desc">Minimal, text-only — no CTA button</span></header>
+        <div class="wf-sketch col center gap-sm" style="text-align:center;">
+          <div class="ln ln--xs" style="margin:0 auto;"></div>
+          <div class="ln ln--md ln--thick" style="margin:0 auto;"></div>
+          <div class="ln ln--sm" style="margin:0 auto;"></div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ============ ABOUT ============ -->
+  <section class="section-block">
+    <div class="section-block__head"><span class="section-index mono">03</span><h2>About</h2></div>
+    <p class="section-block__file mono">src/components/About.tsx</p>
+    <div class="nine">
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-01</span><span class="wf-desc">Two-column — text left, image right</span></header>
+        <div class="wf-sketch">
+          <div class="grid-2">
+            <div class="col gap-sm"><div class="ln ln--full"></div><div class="ln ln--full"></div><div class="ln ln--md"></div><div class="ln ln--sm"></div></div>
+            <div class="img-ph" style="height:90px;"></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-02</span><span class="wf-desc">Two-column reversed — image left, text right</span></header>
+        <div class="wf-sketch">
+          <div class="grid-2">
+            <div class="img-ph" style="height:90px;"></div>
+            <div class="col gap-sm"><div class="ln ln--full"></div><div class="ln ln--full"></div><div class="ln ln--md"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-03</span><span class="wf-desc">Centered story text with a pull-quote mid-paragraph</span></header>
+        <div class="wf-sketch col gap-xs">
+          <div class="ln ln--full"></div><div class="ln ln--lg"></div>
+          <div class="ln ln--md ln--accent ln--thick" style="margin:0.25rem 0;"></div>
+          <div class="ln ln--full"></div><div class="ln ln--sm"></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-04</span><span class="wf-desc">Text on top, stat row beneath</span></header>
+        <div class="wf-sketch col gap-md">
+          <div class="col gap-sm"><div class="ln ln--full"></div><div class="ln ln--lg"></div></div>
+          <div class="grid-3">
+            <div class="stat-block col gap-xs"><div class="ln ln--sm ln--thick" style="margin:0 auto;"></div><div class="ln ln--xs" style="margin:0 auto;"></div></div>
+            <div class="stat-block col gap-xs"><div class="ln ln--sm ln--thick" style="margin:0 auto;"></div><div class="ln ln--xs" style="margin:0 auto;"></div></div>
+            <div class="stat-block col gap-xs"><div class="ln ln--sm ln--thick" style="margin:0 auto;"></div><div class="ln ln--xs" style="margin:0 auto;"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-05</span><span class="wf-desc">Timeline / milestones, sequential steps</span></header>
+        <div class="wf-sketch">
+          <div class="row between" style="align-items:flex-start;">
+            <div class="col gap-xs center"><div class="dot-ph is-active" style="width:9px;height:9px;"></div><div class="ln ln--xs"></div></div>
+            <div class="col gap-xs center"><div class="dot-ph is-active" style="width:9px;height:9px;"></div><div class="ln ln--xs"></div></div>
+            <div class="col gap-xs center"><div class="dot-ph is-active" style="width:9px;height:9px;"></div><div class="ln ln--xs"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-06</span><span class="wf-desc">Text plus a grid of small value/principle cards</span></header>
+        <div class="wf-sketch col gap-md">
+          <div class="ln ln--full"></div>
+          <div class="grid-3">
+            <div class="stat-block"><div class="ln ln--xs" style="margin:0 auto;"></div></div>
+            <div class="stat-block"><div class="ln ln--xs" style="margin:0 auto;"></div></div>
+            <div class="stat-block"><div class="ln ln--xs" style="margin:0 auto;"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-07</span><span class="wf-desc">Full-width text over background image, panel</span></header>
+        <div class="wf-sketch">
+          <div class="img-ph" style="height:110px; display:flex; align-items:center; justify-content:center;">
+            <div class="col gap-sm" style="background:var(--card-bg); opacity:0.94; padding:0.5rem 0.8rem; width:82%;"><div class="ln ln--full"></div><div class="ln ln--md"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-08</span><span class="wf-desc">Founder/team photo beside a short bio</span></header>
+        <div class="wf-sketch">
+          <div class="grid-2">
+            <div class="avatar-ph" style="width:64px;height:64px;margin:0 auto;"></div>
+            <div class="col gap-sm"><div class="ln ln--sm ln--thick"></div><div class="ln ln--full"></div><div class="ln ln--md"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-09</span><span class="wf-desc">Text left, checklist of differentiators right</span></header>
+        <div class="wf-sketch">
+          <div class="grid-2">
+            <div class="col gap-sm"><div class="ln ln--full"></div><div class="ln ln--full"></div><div class="ln ln--md"></div></div>
+            <div class="col gap-sm">
+              <div class="row gap-sm"><div class="icon-ph" style="width:13px;height:13px;border-radius:3px;"></div><div class="ln ln--md"></div></div>
+              <div class="row gap-sm"><div class="icon-ph" style="width:13px;height:13px;border-radius:3px;"></div><div class="ln ln--md"></div></div>
+              <div class="row gap-sm"><div class="icon-ph" style="width:13px;height:13px;border-radius:3px;"></div><div class="ln ln--sm"></div></div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ============ SERVICES ============ -->
+  <section class="section-block">
+    <div class="section-block__head"><span class="section-index mono">04</span><h2>Services</h2></div>
+    <p class="section-block__file mono">src/components/Services.tsx</p>
+    <div class="nine">
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-01</span><span class="wf-desc">3-column icon cards</span></header>
+        <div class="wf-sketch">
+          <div class="grid-3">
+            <div class="card-mini col gap-sm center"><div class="icon-ph"></div><div class="ln ln--sm"></div><div class="ln ln--xs"></div></div>
+            <div class="card-mini col gap-sm center"><div class="icon-ph"></div><div class="ln ln--sm"></div><div class="ln ln--xs"></div></div>
+            <div class="card-mini col gap-sm center"><div class="icon-ph"></div><div class="ln ln--sm"></div><div class="ln ln--xs"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-02</span><span class="wf-desc">2-column larger cards with image</span></header>
+        <div class="wf-sketch">
+          <div class="grid-2">
+            <div class="card-mini col gap-xs"><div class="img-ph" style="height:44px;"></div><div class="ln ln--sm ln--thick"></div><div class="ln ln--full"></div></div>
+            <div class="card-mini col gap-xs"><div class="img-ph" style="height:44px;"></div><div class="ln ln--sm ln--thick"></div><div class="ln ln--full"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-03</span><span class="wf-desc">Stacked rows, icon left</span></header>
+        <div class="wf-sketch col gap-sm">
+          <div class="row gap-md"><div class="icon-ph"></div><div class="col gap-xs grow"><div class="ln ln--sm"></div><div class="ln ln--lg"></div></div></div>
+          <div class="row gap-md"><div class="icon-ph"></div><div class="col gap-xs grow"><div class="ln ln--sm"></div><div class="ln ln--lg"></div></div></div>
+          <div class="row gap-md"><div class="icon-ph"></div><div class="col gap-xs grow"><div class="ln ln--sm"></div><div class="ln ln--lg"></div></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-04</span><span class="wf-desc">Tabbed categories, one content panel</span></header>
+        <div class="wf-sketch col gap-md">
+          <div class="row gap-sm"><div class="tab-ph is-active"></div><div class="tab-ph"></div><div class="tab-ph"></div></div>
+          <div class="card-mini col gap-sm"><div class="ln ln--full"></div><div class="ln ln--lg"></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-05</span><span class="wf-desc">Alternating image/text, left-right-left</span></header>
+        <div class="wf-sketch col gap-sm">
+          <div class="grid-2"><div class="col gap-xs"><div class="ln ln--sm ln--thick"></div><div class="ln ln--full"></div></div><div class="img-ph" style="height:38px;"></div></div>
+          <div class="grid-2"><div class="img-ph" style="height:38px;"></div><div class="col gap-xs"><div class="ln ln--sm ln--thick"></div><div class="ln ln--full"></div></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-06</span><span class="wf-desc">Numbered steps (01, 02, 03) as a process</span></header>
+        <div class="wf-sketch">
+          <div class="grid-3">
+            <div class="col gap-xs center"><div class="icon-ph" style="border-radius:50%;"></div><div class="ln ln--sm"></div></div>
+            <div class="col gap-xs center"><div class="icon-ph" style="border-radius:50%;"></div><div class="ln ln--sm"></div></div>
+            <div class="col gap-xs center"><div class="icon-ph" style="border-radius:50%;"></div><div class="ln ln--sm"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-07</span><span class="wf-desc">Accordion — collapsible rows</span></header>
+        <div class="wf-sketch col gap-sm">
+          <div class="row between card-mini"><div class="ln ln--md"></div><div class="icon-ph" style="width:13px;height:13px;"></div></div>
+          <div class="row between card-mini"><div class="ln ln--md"></div><div class="icon-ph" style="width:13px;height:13px;"></div></div>
+          <div class="row between card-mini"><div class="ln ln--md"></div><div class="icon-ph" style="width:13px;height:13px;"></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-08</span><span class="wf-desc">One featured service, rest in a smaller grid</span></header>
+        <div class="wf-sketch col gap-sm">
+          <div class="card-mini row gap-md"><div class="img-ph" style="width:52px;height:38px;flex:none;"></div><div class="col gap-xs grow"><div class="ln ln--sm ln--thick"></div><div class="ln ln--full"></div></div></div>
+          <div class="grid-3"><div class="stat-block"><div class="ln ln--xs" style="margin:0 auto;"></div></div><div class="stat-block"><div class="ln ln--xs" style="margin:0 auto;"></div></div><div class="stat-block"><div class="ln ln--xs" style="margin:0 auto;"></div></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-09</span><span class="wf-desc">Pricing-card style, each with its own CTA</span></header>
+        <div class="wf-sketch">
+          <div class="grid-3">
+            <div class="card-mini col gap-xs center"><div class="ln ln--sm ln--thick"></div><div class="ln ln--md ln--accent ln--thick"></div><div class="btn-ph" style="margin-top:0.15rem;"></div></div>
+            <div class="card-mini col gap-xs center"><div class="ln ln--sm ln--thick"></div><div class="ln ln--md ln--accent ln--thick"></div><div class="btn-ph" style="margin-top:0.15rem;"></div></div>
+            <div class="card-mini col gap-xs center"><div class="ln ln--sm ln--thick"></div><div class="ln ln--md ln--accent ln--thick"></div><div class="btn-ph" style="margin-top:0.15rem;"></div></div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ============ TESTIMONIALS ============ -->
+  <section class="section-block">
+    <div class="section-block__head"><span class="section-index mono">05</span><h2>Testimonials</h2></div>
+    <p class="section-block__file mono">src/components/Testimonials.tsx</p>
+    <div class="nine">
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-01</span><span class="wf-desc">3-column quote cards</span></header>
+        <div class="wf-sketch">
+          <div class="grid-3">
+            <div class="card-mini col gap-sm"><div class="row gap-sm"><div class="avatar-ph" style="width:18px;height:18px;"></div><div class="ln ln--sm"></div></div><div class="ln ln--full"></div><div class="ln ln--md"></div></div>
+            <div class="card-mini col gap-sm"><div class="row gap-sm"><div class="avatar-ph" style="width:18px;height:18px;"></div><div class="ln ln--sm"></div></div><div class="ln ln--full"></div><div class="ln ln--md"></div></div>
+            <div class="card-mini col gap-sm"><div class="row gap-sm"><div class="avatar-ph" style="width:18px;height:18px;"></div><div class="ln ln--sm"></div></div><div class="ln ln--full"></div><div class="ln ln--md"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-02</span><span class="wf-desc">Single centered quote, carousel dots</span></header>
+        <div class="wf-sketch col center gap-sm" style="text-align:center;">
+          <div class="ln ln--lg ln--thick" style="margin:0 auto;"></div>
+          <div class="ln ln--md ln--thick" style="margin:0 auto;"></div>
+          <div class="avatar-ph" style="margin:0.2rem auto 0;"></div>
+          <div class="ln ln--xs" style="margin:0 auto;"></div>
+          <div class="row gap-sm center" style="margin-top:0.1rem;"><div class="dot-ph"></div><div class="dot-ph is-active"></div><div class="dot-ph"></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-03</span><span class="wf-desc">Featured testimonial left, shorter quotes right</span></header>
+        <div class="wf-sketch">
+          <div class="grid-2">
+            <div class="card-mini col gap-sm"><div class="avatar-ph"></div><div class="ln ln--full"></div><div class="ln ln--md"></div></div>
+            <div class="col gap-sm">
+              <div class="row gap-sm"><div class="avatar-ph" style="width:16px;height:16px;"></div><div class="ln ln--md"></div></div>
+              <div class="row gap-sm"><div class="avatar-ph" style="width:16px;height:16px;"></div><div class="ln ln--md"></div></div>
+              <div class="row gap-sm"><div class="avatar-ph" style="width:16px;height:16px;"></div><div class="ln ln--sm"></div></div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-04</span><span class="wf-desc">Horizontal row of quote cards</span></header>
+        <div class="wf-sketch">
+          <div class="grid-3">
+            <div class="card-mini col gap-xs"><div class="ln ln--sm"></div><div class="ln ln--full"></div></div>
+            <div class="card-mini col gap-xs"><div class="ln ln--sm"></div><div class="ln ln--full"></div></div>
+            <div class="card-mini col gap-xs"><div class="ln ln--sm"></div><div class="ln ln--full"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-05</span><span class="wf-desc">Client/partner logo row above one quote</span></header>
+        <div class="wf-sketch col gap-md">
+          <div class="row gap-md center"><div class="icon-ph"></div><div class="icon-ph"></div><div class="icon-ph"></div><div class="icon-ph"></div></div>
+          <div class="col gap-xs center" style="text-align:center;"><div class="ln ln--lg" style="margin:0 auto;"></div><div class="ln ln--xs" style="margin:0 auto;"></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-06</span><span class="wf-desc">3 trust stats above a row of short quotes</span></header>
+        <div class="wf-sketch col gap-md">
+          <div class="grid-3">
+            <div class="stat-block"><div class="ln ln--sm ln--thick" style="margin:0 auto;"></div></div>
+            <div class="stat-block"><div class="ln ln--sm ln--thick" style="margin:0 auto;"></div></div>
+            <div class="stat-block"><div class="ln ln--sm ln--thick" style="margin:0 auto;"></div></div>
+          </div>
+          <div class="row gap-sm"><div class="ln ln--md"></div><div class="ln ln--md"></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-07</span><span class="wf-desc">Video-style thumbnail cards, name beneath</span></header>
+        <div class="wf-sketch">
+          <div class="grid-3">
+            <div class="col gap-xs"><div class="img-ph" style="height:44px;"></div><div class="ln ln--sm"></div></div>
+            <div class="col gap-xs"><div class="img-ph" style="height:44px;"></div><div class="ln ln--sm"></div></div>
+            <div class="col gap-xs"><div class="img-ph" style="height:44px;"></div><div class="ln ln--sm"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-08</span><span class="wf-desc">Staggered/masonry grid, varying heights</span></header>
+        <div class="wf-sketch">
+          <div class="grid-3">
+            <div class="card-mini col gap-xs" style="padding-bottom:1rem;"><div class="ln ln--sm"></div><div class="ln ln--full"></div></div>
+            <div class="card-mini col gap-xs"><div class="ln ln--sm"></div><div class="ln ln--full"></div><div class="ln ln--md"></div></div>
+            <div class="card-mini col gap-xs" style="padding-bottom:1.6rem;"><div class="ln ln--sm"></div><div class="ln ln--md"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-09</span><span class="wf-desc">Single-column stacked, full-width, dividers</span></header>
+        <div class="wf-sketch col gap-sm">
+          <div class="col gap-xs"><div class="ln ln--full"></div><div class="ln ln--sm"></div></div>
+          <div style="border-top:1px solid var(--line-soft);"></div>
+          <div class="col gap-xs"><div class="ln ln--full"></div><div class="ln ln--sm"></div></div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <section class="section-block">
+    <div class="section-block__head"><span class="section-index mono">06</span><h2>Footer</h2></div>
+    <p class="section-block__file mono">src/components/Footer.tsx</p>
+    <div class="nine">
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-01</span><span class="wf-desc">4-column — brand, nav, services, contact</span></header>
+        <div class="wf-sketch">
+          <div class="grid-4">
+            <div class="col gap-sm"><div class="ln ln--sm ln--thick"></div><div class="ln ln--xs"></div></div>
+            <div class="col gap-sm"><div class="ln ln--xs"></div><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+            <div class="col gap-sm"><div class="ln ln--xs"></div><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+            <div class="col gap-sm"><div class="ln ln--xs"></div><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-02</span><span class="wf-desc">Simple centered — logo, one link row, copyright</span></header>
+        <div class="wf-sketch col center gap-sm">
+          <div class="ln ln--xs ln--thick"></div>
+          <div class="row gap-md"><div class="ln ln--xs"></div><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+          <div class="ln ln--sm" style="opacity:0.6;"></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-03</span><span class="wf-desc">Contact/address left, newsletter form right</span></header>
+        <div class="wf-sketch">
+          <div class="grid-2">
+            <div class="col gap-sm"><div class="ln ln--sm ln--thick"></div><div class="ln ln--md"></div><div class="ln ln--sm"></div></div>
+            <div class="col gap-sm"><div class="ln ln--md"></div><div class="row gap-sm"><div class="ln ln--md grow"></div><div class="btn-ph" style="width:40px;"></div></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-04</span><span class="wf-desc">Wide CTA banner above standard link columns</span></header>
+        <div class="wf-sketch col gap-md">
+          <div class="card-mini row between center"><div class="ln ln--md ln--thick"></div><div class="btn-ph"></div></div>
+          <div class="grid-3">
+            <div class="col gap-xs"><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+            <div class="col gap-xs"><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+            <div class="col gap-xs"><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-05</span><span class="wf-desc">Social icons row prominent above link columns</span></header>
+        <div class="wf-sketch col gap-md">
+          <div class="row gap-sm center"><div class="icon-ph"></div><div class="icon-ph"></div><div class="icon-ph"></div><div class="icon-ph"></div></div>
+          <div class="grid-3"><div class="ln ln--xs" style="margin:0 auto;"></div><div class="ln ln--xs" style="margin:0 auto;"></div><div class="ln ln--xs" style="margin:0 auto;"></div></div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-06</span><span class="wf-desc">Minimal single row — logo, copyright + legal</span></header>
+        <div class="wf-sketch">
+          <div class="row between">
+            <div class="ln ln--xs ln--thick"></div>
+            <div class="row gap-md"><div class="ln ln--xs" style="opacity:0.6;"></div><div class="ln ln--xs" style="opacity:0.6;"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-07</span><span class="wf-desc">3-column — about blurb, sitemap, contact+social</span></header>
+        <div class="wf-sketch">
+          <div class="grid-3">
+            <div class="col gap-xs"><div class="ln ln--sm ln--thick"></div><div class="ln ln--full"></div></div>
+            <div class="col gap-xs"><div class="ln ln--xs"></div><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+            <div class="col gap-xs"><div class="ln ln--xs"></div><div class="row gap-sm"><div class="icon-ph" style="width:13px;height:13px;"></div><div class="icon-ph" style="width:13px;height:13px;"></div></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-08</span><span class="wf-desc">Embedded map/location block beside contact details</span></header>
+        <div class="wf-sketch">
+          <div class="grid-2">
+            <div class="img-ph" style="height:64px;"></div>
+            <div class="col gap-sm"><div class="ln ln--sm ln--thick"></div><div class="ln ln--md"></div><div class="ln ln--sm"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="wf-card">
+        <header class="wf-card__head"><span class="wf-id mono">WF-09</span><span class="wf-desc">Contact form beside brand + nav link columns</span></header>
+        <div class="wf-sketch">
+          <div class="grid-2">
+            <div class="col gap-sm"><div class="ln ln--sm ln--thick"></div><div class="ln ln--xs"></div><div class="ln ln--xs"></div></div>
+            <div class="col gap-sm"><div class="ln ln--full"></div><div class="ln ln--full"></div><div class="btn-ph"></div></div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <footer class="colophon mono">
+    All 54 shown — 9 layouts × 6 sections, WF-## ids match both
+    agents/coders/&lt;section&gt;.js (descriptions) and
+    agents/coders/templates/&lt;section&gt;/*.tsx (real code). Manager assigns one per section per
+    project — random on a fresh build, reused on edits. Content ({{TOKEN}} placeholders in each
+    template) is filled per-project by the Coder's content-writer call, not shown here.
+  </footer>
+
+</div>
