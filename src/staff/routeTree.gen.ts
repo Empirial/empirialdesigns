@@ -26,6 +26,7 @@ import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AgentAssistantRouteImport } from './routes/agent.assistant'
 import { Route as AgentDashboardRouteImport } from './routes/agent.dashboard'
 import { Route as AgentFollowUpsRouteImport } from './routes/agent.follow-ups'
+import { Route as AgentMarketingRouteImport } from './routes/agent.marketing'
 import { Route as AgentMessagesRouteImport } from './routes/agent.messages'
 import { Route as AgentPerformanceRouteImport } from './routes/agent.performance'
 import { Route as AgentProfileRouteImport } from './routes/agent.profile'
@@ -33,6 +34,8 @@ import { Route as AgentScriptsRouteImport } from './routes/agent.scripts'
 import { Route as AgentServicesRouteImport } from './routes/agent.services'
 import { Route as AdminAgentsIndexRouteImport } from './routes/admin.agents.index'
 import { Route as AdminAgentsIdRouteImport } from './routes/admin.agents.$id'
+import { Route as AgentAcademyIndexRouteImport } from './routes/agent.academy.index'
+import { Route as AgentAcademyLessonIdRouteImport } from './routes/agent.academy.$lessonId'
 import { Route as AgentLeadsIndexRouteImport } from './routes/agent.leads.index'
 import { Route as AgentLeadsIdRouteImport } from './routes/agent.leads.$id'
 
@@ -121,6 +124,11 @@ const AgentFollowUpsRoute = AgentFollowUpsRouteImport.update({
   path: '/follow-ups',
   getParentRoute: () => AgentRoute,
 } as any)
+const AgentMarketingRoute = AgentMarketingRouteImport.update({
+  id: '/marketing',
+  path: '/marketing',
+  getParentRoute: () => AgentRoute,
+} as any)
 const AgentMessagesRoute = AgentMessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
@@ -156,6 +164,16 @@ const AdminAgentsIdRoute = AdminAgentsIdRouteImport.update({
   path: '/agents/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AgentAcademyIndexRoute = AgentAcademyIndexRouteImport.update({
+  id: '/academy/',
+  path: '/academy/',
+  getParentRoute: () => AgentRoute,
+} as any)
+const AgentAcademyLessonIdRoute = AgentAcademyLessonIdRouteImport.update({
+  id: '/academy/$lessonId',
+  path: '/academy/$lessonId',
+  getParentRoute: () => AgentRoute,
+} as any)
 const AgentLeadsIndexRoute = AgentLeadsIndexRouteImport.update({
   id: '/leads/',
   path: '/leads/',
@@ -185,14 +203,17 @@ export interface FileRoutesByFullPath {
   '/agent/assistant': typeof AgentAssistantRoute
   '/agent/dashboard': typeof AgentDashboardRoute
   '/agent/follow-ups': typeof AgentFollowUpsRoute
+  '/agent/marketing': typeof AgentMarketingRoute
   '/agent/messages': typeof AgentMessagesRoute
   '/agent/performance': typeof AgentPerformanceRoute
   '/agent/profile': typeof AgentProfileRoute
   '/agent/scripts': typeof AgentScriptsRoute
   '/agent/services': typeof AgentServicesRoute
   '/admin/agents/$id': typeof AdminAgentsIdRoute
+  '/agent/academy/$lessonId': typeof AgentAcademyLessonIdRoute
   '/agent/leads/$id': typeof AgentLeadsIdRoute
   '/admin/agents/': typeof AdminAgentsIndexRoute
+  '/agent/academy/': typeof AgentAcademyIndexRoute
   '/agent/leads/': typeof AgentLeadsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -213,14 +234,17 @@ export interface FileRoutesByTo {
   '/agent/assistant': typeof AgentAssistantRoute
   '/agent/dashboard': typeof AgentDashboardRoute
   '/agent/follow-ups': typeof AgentFollowUpsRoute
+  '/agent/marketing': typeof AgentMarketingRoute
   '/agent/messages': typeof AgentMessagesRoute
   '/agent/performance': typeof AgentPerformanceRoute
   '/agent/profile': typeof AgentProfileRoute
   '/agent/scripts': typeof AgentScriptsRoute
   '/agent/services': typeof AgentServicesRoute
   '/admin/agents/$id': typeof AdminAgentsIdRoute
+  '/agent/academy/$lessonId': typeof AgentAcademyLessonIdRoute
   '/agent/leads/$id': typeof AgentLeadsIdRoute
   '/admin/agents': typeof AdminAgentsIndexRoute
+  '/agent/academy': typeof AgentAcademyIndexRoute
   '/agent/leads': typeof AgentLeadsIndexRoute
 }
 export interface FileRoutesById {
@@ -242,14 +266,17 @@ export interface FileRoutesById {
   '/agent/assistant': typeof AgentAssistantRoute
   '/agent/dashboard': typeof AgentDashboardRoute
   '/agent/follow-ups': typeof AgentFollowUpsRoute
+  '/agent/marketing': typeof AgentMarketingRoute
   '/agent/messages': typeof AgentMessagesRoute
   '/agent/performance': typeof AgentPerformanceRoute
   '/agent/profile': typeof AgentProfileRoute
   '/agent/scripts': typeof AgentScriptsRoute
   '/agent/services': typeof AgentServicesRoute
   '/admin/agents/$id': typeof AdminAgentsIdRoute
+  '/agent/academy/$lessonId': typeof AgentAcademyLessonIdRoute
   '/agent/leads/$id': typeof AgentLeadsIdRoute
   '/admin/agents/': typeof AdminAgentsIndexRoute
+  '/agent/academy/': typeof AgentAcademyIndexRoute
   '/agent/leads/': typeof AgentLeadsIndexRoute
 }
 export interface FileRouteTypes {
@@ -272,14 +299,17 @@ export interface FileRouteTypes {
     | '/agent/assistant'
     | '/agent/dashboard'
     | '/agent/follow-ups'
+    | '/agent/marketing'
     | '/agent/messages'
     | '/agent/performance'
     | '/agent/profile'
     | '/agent/scripts'
     | '/agent/services'
     | '/admin/agents/$id'
+    | '/agent/academy/$lessonId'
     | '/agent/leads/$id'
     | '/admin/agents/'
+    | '/agent/academy/'
     | '/agent/leads/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -300,14 +330,17 @@ export interface FileRouteTypes {
     | '/agent/assistant'
     | '/agent/dashboard'
     | '/agent/follow-ups'
+    | '/agent/marketing'
     | '/agent/messages'
     | '/agent/performance'
     | '/agent/profile'
     | '/agent/scripts'
     | '/agent/services'
     | '/admin/agents/$id'
+    | '/agent/academy/$lessonId'
     | '/agent/leads/$id'
     | '/admin/agents'
+    | '/agent/academy'
     | '/agent/leads'
   id:
     | '__root__'
@@ -328,14 +361,17 @@ export interface FileRouteTypes {
     | '/agent/assistant'
     | '/agent/dashboard'
     | '/agent/follow-ups'
+    | '/agent/marketing'
     | '/agent/messages'
     | '/agent/performance'
     | '/agent/profile'
     | '/agent/scripts'
     | '/agent/services'
     | '/admin/agents/$id'
+    | '/agent/academy/$lessonId'
     | '/agent/leads/$id'
     | '/admin/agents/'
+    | '/agent/academy/'
     | '/agent/leads/'
   fileRoutesById: FileRoutesById
 }
@@ -467,6 +503,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentFollowUpsRouteImport
       parentRoute: typeof AgentRoute
     }
+    '/agent/marketing': {
+      id: '/agent/marketing'
+      path: '/marketing'
+      fullPath: '/agent/marketing'
+      preLoaderRoute: typeof AgentMarketingRouteImport
+      parentRoute: typeof AgentRoute
+    }
     '/agent/messages': {
       id: '/agent/messages'
       path: '/messages'
@@ -515,6 +558,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/agents/$id'
       preLoaderRoute: typeof AdminAgentsIdRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/agent/academy/': {
+      id: '/agent/academy/'
+      path: '/academy'
+      fullPath: '/agent/academy/'
+      preLoaderRoute: typeof AgentAcademyIndexRouteImport
+      parentRoute: typeof AgentRoute
+    }
+    '/agent/academy/$lessonId': {
+      id: '/agent/academy/$lessonId'
+      path: '/academy/$lessonId'
+      fullPath: '/agent/academy/$lessonId'
+      preLoaderRoute: typeof AgentAcademyLessonIdRouteImport
+      parentRoute: typeof AgentRoute
     }
     '/agent/leads/': {
       id: '/agent/leads/'
@@ -569,12 +626,15 @@ interface AgentRouteChildren {
   AgentAssistantRoute: typeof AgentAssistantRoute
   AgentDashboardRoute: typeof AgentDashboardRoute
   AgentFollowUpsRoute: typeof AgentFollowUpsRoute
+  AgentMarketingRoute: typeof AgentMarketingRoute
   AgentMessagesRoute: typeof AgentMessagesRoute
   AgentPerformanceRoute: typeof AgentPerformanceRoute
   AgentProfileRoute: typeof AgentProfileRoute
   AgentScriptsRoute: typeof AgentScriptsRoute
   AgentServicesRoute: typeof AgentServicesRoute
+  AgentAcademyLessonIdRoute: typeof AgentAcademyLessonIdRoute
   AgentLeadsIdRoute: typeof AgentLeadsIdRoute
+  AgentAcademyIndexRoute: typeof AgentAcademyIndexRoute
   AgentLeadsIndexRoute: typeof AgentLeadsIndexRoute
 }
 
@@ -582,12 +642,15 @@ const AgentRouteChildren: AgentRouteChildren = {
   AgentAssistantRoute: AgentAssistantRoute,
   AgentDashboardRoute: AgentDashboardRoute,
   AgentFollowUpsRoute: AgentFollowUpsRoute,
+  AgentMarketingRoute: AgentMarketingRoute,
   AgentMessagesRoute: AgentMessagesRoute,
   AgentPerformanceRoute: AgentPerformanceRoute,
   AgentProfileRoute: AgentProfileRoute,
   AgentScriptsRoute: AgentScriptsRoute,
   AgentServicesRoute: AgentServicesRoute,
+  AgentAcademyLessonIdRoute: AgentAcademyLessonIdRoute,
   AgentLeadsIdRoute: AgentLeadsIdRoute,
+  AgentAcademyIndexRoute: AgentAcademyIndexRoute,
   AgentLeadsIndexRoute: AgentLeadsIndexRoute,
 }
 

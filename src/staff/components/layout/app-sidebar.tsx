@@ -16,6 +16,8 @@ import {
   Users,
   MessageSquare,
   UserCircle,
+  GraduationCap,
+  Megaphone,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -64,9 +66,11 @@ const AGENT_NAV: NavItem[] = [
   { title: "My Leads", to: "/agent/leads", icon: BriefcaseBusiness },
   { title: "Follow-ups", to: "/agent/follow-ups", icon: CalendarClock, badge: "followups" },
   { title: "Messages", to: "/agent/messages", icon: MessageSquare },
+  { title: "Sales Academy", to: "/agent/academy", icon: GraduationCap },
   { title: "Scripts & Lessons", to: "/agent/scripts", icon: FileText },
   { title: "AI Assistant", to: "/agent/assistant", icon: Bot },
   { title: "Services", to: "/agent/services", icon: Package },
+  { title: "Marketing Materials", to: "/agent/marketing", icon: Megaphone },
   { title: "Performance", to: "/agent/performance", icon: Gauge },
   { title: "My Profile", to: "/agent/profile", icon: UserCircle },
 ];
