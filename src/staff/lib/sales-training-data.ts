@@ -18,7 +18,15 @@ export type TrainingLesson = {
   // lessons (including anything uploaded via the JSON importer in
   // admin.scripts.tsx) keep working with just title/summary/points.
   body?: string;
+  // The source manual's "Activity" was written for a live, facilitator-led
+  // session ("pair up two trainees", "ask the trainee directly") — it
+  // doesn't work as self-serve web content, so the lesson page renders a
+  // real quiz instead when `quiz` is present. `activity` is kept for any
+  // lesson that hasn't been given quiz questions yet (falls back to plain
+  // text), and for the facilitator-notes use case if this course is ever
+  // run live again.
   activity?: string;
+  quiz?: { question: string; options: string[]; answer: number }[];
   keyTakeaway?: string;
   mentors?: string[];
 };
@@ -43,6 +51,18 @@ Here's how the next forty-five minutes work: five modules, each with a short tea
 Before we start, sit with one honest question: what's the one thing that's made you feel unsure or hesitant on a sales call before? Hold onto your answer. We're going to address it, piece by piece, as we move through the five modules ahead.`,
     activity:
       `Take two minutes. Ask the trainee directly: “What's one thing that's stopped you from feeling confident on a sales call before?” Don't rush past the answer — write it down. Whatever they name — fear of rejection, not knowing what to say when someone pushes back, feeling pushy — will very likely be addressed directly in one of the next five modules. Noting it now gives you a natural moment to circle back at the end of the course and show them exactly how it was covered.`,
+    quiz: [
+      {
+        question: "What score do you need on the final assessment to earn the Certified Sales Professional certificate?",
+        options: ["3 out of 5 (60%)", "4 out of 5 (80%)", "A perfect 5 out of 5 (100%)"],
+        answer: 1,
+      },
+      {
+        question: "The course's five pillars are Sales Fundamentals, Prospecting & Leads, Communication, Closing Deals, and…",
+        options: ["Business Growth", "Product Knowledge", "Time Management"],
+        answer: 0,
+      },
+    ],
     keyTakeaway:
       "Five pillars, five modules, one certificate. The activities build the skill — don't skip them.",
     order: 1,
@@ -72,6 +92,18 @@ Before we start, sit with one honest question: what's the one thing that's made 
 [GITOMER] Finally, remember Gitomer's point about passion: it's visible, and it can't be faked convincingly for long. If you don't genuinely believe that what EmpirialDesigns builds will help the business owner on the other end of the phone, they will sense it within the first thirty seconds, no matter how polished your script sounds. Believe in the value first — the script is just the vehicle that carries it.`,
     activity:
       `Pair up two trainees, or reflect solo if working one-on-one. Give two minutes: “Think of something you bought recently — anything, big or small. What made it feel like you chose to buy it, rather than feeling sold to?” Have them identify the emotional trigger first, then the logical justification they used afterward. Debrief as a group: most people notice the emotional trigger came first, even when they insist they're “logical buyers.”`,
+    quiz: [
+      {
+        question: "According to Gitomer, nearly every objection a prospect raises is really a disguised…",
+        options: ["Risk concern", "Attempt to negotiate a discount", "Sign they're not interested at all"],
+        answer: 0,
+      },
+      {
+        question: "According to Sales Feed's research, in what order do people actually make buying decisions?",
+        options: ["Logically first, then justify emotionally", "Emotionally first, then build the logical case afterward", "Purely on price, with no emotional component"],
+        answer: 1,
+      },
+    ],
     keyTakeaway:
       "People buy because they want to, not because they're pushed. Give them a real reason, lower their risk, and let logic follow emotion.",
     mentors: ["Jeffrey Gitomer", "Sales Feed"],
@@ -102,6 +134,18 @@ Where do these leads actually come from? Referrals from happy clients, local bus
 [IANNARINO] Iannarino frames the whole activity of prospecting as an act of value creation rather than an interruption. Every call should hand the prospect something useful — an insight about their own business they hadn't quite articulated — rather than simply announcing what EmpirialDesigns sells. This is exactly why the Sales Playbook's Industry Playbook Cards exist: before you dial a plumber, a guesthouse owner, or a salon owner, you should already know their most common pain point and have an opening hook line ready that's specific to their world, not the generic company pitch.`,
     activity:
       `Give the trainee three real or hypothetical local businesses to work through — a plumber, a guesthouse, and a hair salon. For each, have them open the Sales Playbook, find the matching Industry Card, identify the pain point that fits, and read out loud the opening hook line they'd use. Then push one step further: for each business, have them name the specific small “commitment for time” they'd ask for before pitching anything at all — the exact first question or line that earns permission to keep talking.`,
+    quiz: [
+      {
+        question: "What does Iannarino call the very first small \"yes\" you need from a prospect, before pitching anything?",
+        options: ["The commitment for time", "A verbal agreement to buy", "Their email address"],
+        answer: 0,
+      },
+      {
+        question: "Per Sales Feed's research, what should you qualify a lead on instead of manufactured pressure like countdown timers?",
+        options: ["Their job title", "Real urgency the prospect already feels", "How quickly they answer the phone"],
+        answer: 1,
+      },
+    ],
     keyTakeaway:
       "Earn the right to keep talking before you pitch. Lead with insight, not a feature list, and qualify on real urgency, not manufactured pressure.",
     mentors: ["Anthony Iannarino", "Sales Feed"],
@@ -136,6 +180,18 @@ The return question matters more than it might seem. It turns a monologue back i
 [GITOMER] Jeffrey Gitomer's advice pairs naturally with this: never argue about price. The moment a call turns into a back-and-forth over whether the price is “fair,” you've already lost the value frame you built earlier in the call. Instead, bring the conversation back to the value delivered — what specifically changes for their business once this is live. And resist the instinct to discount your way to a yes. A quick, unprompted discount quietly signals to the prospect that your original number wasn't the real value in the first place, which can do more damage to trust than the objection itself ever could.`,
     activity:
       `Run this as a role-play in pairs, three minutes total. One trainee plays the prospect and raises two objections drawn from the Sales Playbook for any service of their choice. The other plays the agent and works through Acknowledge, Reframe, Return for each one. Once both objections have been handled, add the negotiation layer: have the “agent” state a price or next step out loud, and then both trainees practise sitting in three full seconds of real silence before either one speaks again. It will feel uncomfortable the first time — that discomfort is exactly the muscle this activity is building.`,
+    quiz: [
+      {
+        question: "Victor Antonio says every buyer ultimately cares about increasing revenue, reducing costs, and…",
+        options: ["Expanding reach or market share", "Getting the lowest possible price", "Working with a well-known brand"],
+        answer: 0,
+      },
+      {
+        question: "What's the three-step formula for handling an objection?",
+        options: ["Agree, Discount, Close", "Acknowledge, Reframe, Return", "Interrupt, Correct, Move on"],
+        answer: 1,
+      },
+    ],
     keyTakeaway:
       "Translate features into revenue, cost, or reach. Handle objections with Acknowledge, Reframe, Return. And don't be afraid of silence — it's doing work for you.",
     mentors: ["Victor Antonio", "Jeffrey Gitomer"],
@@ -165,6 +221,22 @@ With that foundation in place, you have two practical closing moves to choose fr
 [ANTONIO] One more principle from Victor Antonio belongs here: never trade a concession for nothing. If a prospect pushes for a lower price, or asks you to add something extra to the scope, that's a legitimate negotiation moment, and you can absolutely say yes — but get something back in return. A faster decision today instead of “I'll think about it.” A written testimonial once the project is live. An introduction to another business owner who might need the same thing. Every concession given away for free quietly teaches a prospect that your original offer had room to move, which weakens your position on the very next call with them.`,
     activity:
       `Each trainee picks one of the six EmpirialDesigns services from the Sales Playbook and delivers a thirty-second close, live, to the group or trainer — either an assumptive close or a soft close, their choice, depending on the scenario they imagine themselves in. Immediately afterward, have them name out loud which lever of Hormozi's Value Equation their close leaned on hardest — did they sell the outcome, the proof, the speed, or the ease? There's no wrong answer, but naming it builds the habit of noticing which lever you're pulling on every real call going forward.`,
+    quiz: [
+      {
+        question: "What are the four elements of Hormozi's Value Equation?",
+        options: [
+          "Price, Product, Promotion, Place",
+          "Dream Outcome, Perceived Likelihood of Achievement, Time Delay, and Effort & Sacrifice",
+          "Discovery, Pitch, Objection, Close",
+        ],
+        answer: 1,
+      },
+      {
+        question: "Per Victor Antonio, if a prospect pushes for a concession, what should you always get in return?",
+        options: ["Nothing — just give it to keep the deal moving", "Something back — a faster decision, a testimonial, a referral", "A written apology for negotiating"],
+        answer: 1,
+      },
+    ],
     keyTakeaway:
       "Raise perceived value through outcome, proof, speed, and ease — not just price. Earn the small commitments along the way, and the final close takes care of itself.",
     mentors: ["Alex Hormozi", "Anthony Iannarino", "Victor Antonio"],
@@ -194,6 +266,22 @@ None of this works without visibility into your own numbers. Track how many call
 Finally, remember that every call you make represents more than just your own commission. EmpirialDesigns' own positioning — “Change Is Inevitable” — isn't just a tagline on a certificate. It's the actual reason a business owner should want to pick up the phone for you: to help them modernise before change happens to them instead of for them.`,
     activity:
       `Ask the trainee to name one real or hypothetical client relationship from their own experience, and describe how they'd turn it into either a trusted-advisor relationship in Iannarino's sense, or a referral source in Gitomer's sense, within their first month working with that client. Push for specifics: what exact message would they send, and when?`,
+    quiz: [
+      {
+        question: "What does Gitomer mean by \"the sale begins after the sale\"?",
+        options: [
+          "You should always upsell immediately at the moment of closing",
+          "The real relationship-building — follow-up, referrals, ongoing service — happens after the first purchase",
+          "Commission is only paid once a second sale is made",
+        ],
+        answer: 1,
+      },
+      {
+        question: "Which two of EmpirialDesigns' six services are recurring, monthly relationships rather than once-off?",
+        options: ["Business Website and Poster Design", "Application Development and Custom Software Development", "AI Automation and SEO & Social Media Management"],
+        answer: 2,
+      },
+    ],
     keyTakeaway:
       "The close is the beginning, not the end. Follow up, check in, and ask for referrals — that's where long-term revenue actually comes from.",
     mentors: ["Anthony Iannarino", "Jeffrey Gitomer"],

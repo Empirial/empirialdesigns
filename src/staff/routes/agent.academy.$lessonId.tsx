@@ -1,10 +1,11 @@
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, HelpCircle, XCircle } from "lucide-react";
 import { AppShell } from "@staff/components/layout/app-shell";
 import { PageHeader } from "@staff/components/shared/page-header";
 import { EmptyState } from "@staff/components/shared/empty-state";
 import { Button } from "@staff/components/ui/button";
-import { DEFAULT_SALES_LESSONS, useSalesTrainingLessons } from "@staff/lib/sales-training-data";
+import { DEFAULT_SALES_LESSONS, useSalesTrainingLessons, type TrainingLesson } from "@staff/lib/sales-training-data";
 import { useCourseProgress } from "@staff/lib/academy-data";
 import { cn } from "@staff/lib/utils";
 
@@ -19,11 +20,17 @@ function PageAgentAcademyLesson() {
   const { lessonId } = Route.useParams();
   const { data: courseLessons = DEFAULT_SALES_LESSONS } = useSalesTrainingLessons();
   const { completedLessons, toggleLesson } = useCourseProgress(courseLessons);
+  const [quizPassed, setQuizPassed] = useState(false);
 
   const index = courseLessons.findIndex((l) => l.id === lessonId);
   const lesson = index >= 0 ? courseLessons[index] : undefined;
   const previous = index > 0 ? courseLessons[index - 1] : undefined;
   const next = index >= 0 && index < courseLessons.length - 1 ? courseLessons[index + 1] : undefined;
+
+  // Reset quiz-passed state on navigating to a different lesson.
+  useEffect(() => {
+    setQuizPassed(false);
+  }, [lessonId]);
 
   if (!lesson) {
     return (
@@ -89,7 +96,9 @@ function PageAgentAcademyLesson() {
             </div>
           ) : null}
 
-          {lesson.activity ? (
+          {lesson.quiz && lesson.quiz.length > 0 ? (
+            <LessonQuiz key={lesson.id} quiz={lesson.quiz} onPass={() => setQuizPassed(true)} />
+          ) : lesson.activity ? (
             <div className="mt-8 rounded-xl border border-primary/20 bg-primary/5 p-5">
               <p className="text-xs font-semibold tracking-wide text-primary uppercase">Activity</p>
               <p className="mt-2 text-sm leading-relaxed text-foreground/90">{lesson.activity}</p>
@@ -104,9 +113,18 @@ function PageAgentAcademyLesson() {
           ) : null}
 
           <div className="mt-8 flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
-            <Button variant={complete ? "outline" : "default"} onClick={() => toggleLesson(lesson.id)}>
-              <CheckCircle2 className="mr-1.5 size-4" /> {complete ? "Mark as incomplete" : "Mark lesson complete"}
-            </Button>
+            <div>
+              <Button
+                variant={complete ? "outline" : "default"}
+                disabled={!complete && Boolean(lesson.quiz?.length) && !quizPassed}
+                onClick={() => toggleLesson(lesson.id)}
+              >
+                <CheckCircle2 className="mr-1.5 size-4" /> {complete ? "Mark as incomplete" : "Mark lesson complete"}
+              </Button>
+              {!complete && lesson.quiz?.length && !quizPassed ? (
+                <p className="mt-1.5 text-xs text-muted-foreground">Pass the quiz above to unlock this.</p>
+              ) : null}
+            </div>
             <div className="flex gap-2">
               {previous ? (
                 <Button asChild variant="ghost" size="sm">
@@ -154,5 +172,111 @@ function PageAgentAcademyLesson() {
         </aside>
       </div>
     </AppShell>
+  );
+}
+
+function LessonQuiz({ quiz, onPass }: { quiz: NonNullable<TrainingLesson["quiz"]>; onPass: () => void }) {
+  const [answers, setAnswers] = useState<(number | undefined)[]>(() => quiz.map(() => undefined));
+  const [submitted, setSubmitted] = useState(false);
+
+  const allAnswered = answers.every((a) => a !== undefined);
+  const correctCount = quiz.filter((q, i) => answers[i] === q.answer).length;
+  const passed = submitted && correctCount === quiz.length;
+
+  function handleSubmit() {
+    setSubmitted(true);
+    if (quiz.every((q, i) => answers[i] === q.answer)) {
+      onPass();
+    }
+  }
+
+  function retry() {
+    setAnswers(quiz.map(() => undefined));
+    setSubmitted(false);
+  }
+
+  return (
+    <div className="mt-8 rounded-xl border border-primary/20 bg-primary/5 p-5">
+      <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-primary uppercase">
+        <HelpCircle className="size-4" /> Quick quiz
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">Get every question right to mark this lesson complete.</p>
+
+      <div className="mt-4 space-y-4">
+        {quiz.map((question, qIndex) => {
+          const selected = answers[qIndex];
+          const isCorrect = submitted && selected === question.answer;
+          const isWrong = submitted && selected !== undefined && selected !== question.answer;
+          return (
+            <fieldset key={question.question} className="rounded-lg border border-border bg-card p-4">
+              <legend className="flex items-start gap-2 px-1 text-sm font-medium">
+                {submitted ? (
+                  isCorrect ? (
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                  ) : (
+                    <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                  )
+                ) : null}
+                <span>{question.question}</span>
+              </legend>
+              <div className="mt-2 space-y-1.5">
+                {question.options.map((option, oIndex) => {
+                  const isSelected = selected === oIndex;
+                  const showAsCorrect = submitted && oIndex === question.answer;
+                  const showAsWrongPick = submitted && isSelected && oIndex !== question.answer;
+                  return (
+                    <label
+                      key={option}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors",
+                        showAsCorrect
+                          ? "border-success/40 bg-success/10"
+                          : showAsWrongPick
+                            ? "border-destructive/40 bg-destructive/10"
+                            : isSelected
+                              ? "border-primary bg-primary/10"
+                              : "border-border hover:bg-muted/50",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name={`quiz-${question.question}`}
+                        checked={isSelected}
+                        disabled={submitted}
+                        onChange={() =>
+                          setAnswers((prev) => {
+                            const next = [...prev];
+                            next[qIndex] = oIndex;
+                            return next;
+                          })
+                        }
+                      />
+                      {option}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
+        {!submitted ? (
+          <Button size="sm" disabled={!allAnswered} onClick={handleSubmit}>
+            Check answers
+          </Button>
+        ) : passed ? (
+          <p className="text-sm font-medium text-success">All correct — lesson unlocked below.</p>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">{correctCount} / {quiz.length} correct — give it another go.</p>
+            <Button size="sm" variant="outline" onClick={retry}>
+              Try again
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
