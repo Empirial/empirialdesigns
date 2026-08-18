@@ -70,6 +70,7 @@ import {
 import { useAgents } from "@staff/lib/agents-data";
 import { useLeads } from "@staff/lib/leads";
 import { useDeals } from "@staff/lib/deals-data";
+import { useCallLogs } from "@staff/lib/call-logs-data";
 import { formatZAR } from "@staff/lib/format";
 import { computeAgentStats } from "@staff/components/agents-admin/agent-stats";
 import type { Agent } from "@staff/lib/types";
@@ -94,6 +95,7 @@ function PageAdminAgentsIndex() {
   const { data: agents = [], isLoading: agentsLoading } = useAgents();
   const { data: leads = [], isLoading: leadsLoading } = useLeads();
   const { data: deals = [], isLoading: dealsLoading } = useDeals();
+  const { data: callLogs = [] } = useCallLogs();
   const queryClient = useQueryClient();
   const [view, setView] = useState<"grid" | "table">("grid");
   const [search, setSearch] = useState("");
@@ -120,8 +122,8 @@ function PageAdminAgentsIndex() {
   });
 
   const stats = useMemo(
-    () => agents.map((a) => computeAgentStats(a, leads, deals)),
-    [agents, leads, deals],
+    () => agents.map((a) => computeAgentStats(a, leads, deals, callLogs)),
+    [agents, leads, deals, callLogs],
   );
 
   const filtered = useMemo(() => {

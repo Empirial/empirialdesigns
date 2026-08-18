@@ -19,6 +19,7 @@ import {
 } from "@staff/components/ui/select";
 import { useLeads } from "@staff/lib/leads";
 import { useDeals } from "@staff/lib/deals-data";
+import { useCallLogs } from "@staff/lib/call-logs-data";
 import { useAgents } from "@staff/lib/agents-data";
 import { useServices } from "@staff/lib/services-data";
 import { formatZAR } from "@staff/lib/format";
@@ -95,6 +96,7 @@ function PageAdminDashboard() {
   const followUpsQuery = useAllFollowUps();
   const profileQuery = useOwnProfile();
   const auditLogQuery = useRecentAuditLog();
+  const callLogsQuery = useCallLogs();
 
   const leads = leadsQuery.data ?? [];
   const agents = agentsQuery.data ?? [];
@@ -102,6 +104,7 @@ function PageAdminDashboard() {
   const services = servicesQuery.data ?? [];
   const followUps = followUpsQuery.data ?? [];
   const auditLogEntries = auditLogQuery.data ?? [];
+  const callLogs = callLogsQuery.data ?? [];
 
   const agentOf = (id: string) => agents.find((a) => a.id === id);
   const serviceOf = (id: string) => services.find((s) => s.id === id);
@@ -112,7 +115,7 @@ function PageAdminDashboard() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [tempPasswordResult, setTempPasswordResult] = useState<{ email: string; tempPassword: string } | null>(null);
 
-  const metrics = useDashboardMetrics(leads, agents, deals, services, followUps);
+  const metrics = useDashboardMetrics(leads, agents, deals, services, followUps, callLogs);
 
   const pageLoading = leadsQuery.isLoading || agentsQuery.isLoading || dealsQuery.isLoading || servicesQuery.isLoading;
 

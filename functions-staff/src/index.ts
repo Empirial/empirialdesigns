@@ -10,3 +10,4 @@ export { getTeamLeaderboard } from "./callable/leaderboard";
 export { importLeads } from "./callable/importLeads";
 export { createQuote } from "./callable/quotes";
 export { notifyOverdueFollowUps } from "./scheduled/overdueFollowUps";
+export { autoOfflineIdleAgents } from "./scheduled/autoOfflineIdleAgents";

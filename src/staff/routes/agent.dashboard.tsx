@@ -27,6 +27,7 @@ import { Progress } from "@staff/components/ui/progress";
 import { useAgentDoc } from "@staff/lib/agents-data";
 import { useMyLeads } from "@staff/lib/leads";
 import { useMyDeals } from "@staff/lib/deals-data";
+import { useMyCallLogs, countCallsToday, callsByWeekday } from "@staff/lib/call-logs-data";
 import { useMyFollowUps } from "@staff/lib/followups-data";
 import { callGetTeamLeaderboard } from "@staff/lib/functions";
 import { firebaseAuth, getMockStaffProfile } from "@staff/lib/auth";
@@ -67,6 +68,7 @@ function PageAgentDashboard() {
   const { data: myLeads = [], isLoading: leadsLoading } = useMyLeads();
   const { data: deals = [], isLoading: dealsLoading } = useMyDeals();
   const { data: followUps = [], isLoading: followUpsLoading } = useMyFollowUps();
+  const { data: myCallLogs = [] } = useMyCallLogs(myUid);
   const { data: leaderboard = [], isLoading: leaderboardLoading } = useQuery({
     queryKey: ["leaderboard"],
     queryFn: async () => (mockProfile ? [] : (await callGetTeamLeaderboard()).data.leaderboard),
@@ -121,7 +123,9 @@ function PageAgentDashboard() {
   const commission = myDeals.reduce((s, d) => s + d.commission, 0);
 
   const dailyTarget = Math.max(1, Math.round(agent.targetDeals / 20));
-  const callsToday = agent.callsToday;
+  // Real, from callLogs (written by logCall()) — agent.callsToday is never
+  // incremented by anything and is always 0 in production.
+  const callsToday = countCallsToday(myCallLogs);
   const callProgress = Math.min(100, Math.round((callsToday / (dailyTarget * 5)) * 100));
 
   const overdueFollowUps = myFollowUps.filter((f) => isOverdue(f.dueAt));
@@ -155,9 +159,10 @@ function PageAgentDashboard() {
     { label: "Closed Won", count: myLeads.filter((l) => l.status === "Closed Won").length },
   ];
 
+  const weeklyCalls = callsByWeekday(myCallLogs);
   const callChart = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, i) => ({
     day,
-    calls: agent.callsThisWeek[i] ?? 0,
+    calls: weeklyCalls[i] ?? 0,
   }));
 
   const monthlyCommissionTarget = Math.round(agent.monthlyTarget * 0.1);

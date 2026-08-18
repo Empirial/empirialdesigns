@@ -134,13 +134,17 @@ service cloud.firestore {
       allow get: if isSignedIn() && (request.auth.uid == agentId || isStaffAdmin());
       allow list: if isStaffAdmin();
       // An agent may flip their own live call-availability flag — the
-      // online/offline switch on their dashboard — and set their own payout
-      // banking details from their profile page. Nothing else on this doc;
-      // every other field (target, role, callsToday, ...) stays
-      // Cloud-Functions-owned. isOwnLead-style self-only, onlyChangedFields-
-      // gated, same pattern as leads/followUps/scripts/notifications below.
+      // online/offline switch on their dashboard, now also set automatically
+      // on sign-in/sign-out (see establishStaffSession/signOutUser in
+      // auth.ts) — touch their own lastActiveAt heartbeat (so the
+      // autoOfflineIdleAgents scheduled function can flip stale sessions
+      // back to offline), and set their own payout banking details from
+      // their profile page. Nothing else on this doc; every other field
+      // (target, role, callsToday, ...) stays Cloud-Functions-owned.
+      // isOwnLead-style self-only, onlyChangedFields-gated, same pattern as
+      // leads/followUps/scripts/notifications below.
       allow update: if isSignedIn() && request.auth.uid == agentId
-        && onlyChangedFields(['online', 'bankName', 'accountNumber', 'branchCode']);
+        && onlyChangedFields(['online', 'lastActiveAt', 'bankName', 'accountNumber', 'branchCode']);
       allow write: if false;
     }
 

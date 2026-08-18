@@ -14,6 +14,7 @@ import {
 import { db } from "@staff/lib/firebase";
 import { firebaseAuth, getMockStaffProfile } from "@staff/lib/auth";
 import { followUps as mockFollowUps } from "@staff/lib/mock-data";
+import { countCallsToday, type CallLogRow } from "@staff/lib/call-logs-data";
 import {
   LEAD_STATUSES,
   type Agent,
@@ -138,6 +139,7 @@ export function useDashboardMetrics(
   deals: Deal[],
   services: Service[],
   followUps: FollowUp[],
+  callLogs: CallLogRow[] = [],
 ) {
   /* --------------------------- Revenue over time --------------------------- */
   const revenueOverTime = useMemo(() => computeRevenueOverTime(deals), [deals]);
@@ -145,7 +147,9 @@ export function useDashboardMetrics(
   /* ------------------------------ KPIs ------------------------------ */
   const totalLeads = leads.length;
   const assignedLeads = leads.filter((l) => l.assignedAgentId).length;
-  const callsToday = agents.reduce((sum, a) => sum + a.callsToday, 0);
+  // Real, from callLogs (written by logCall()) — agents/{uid}.callsToday is
+  // never incremented by anything and is always 0 in production.
+  const callsToday = countCallsToday(callLogs);
   const interestedLeads = leads.filter((l) => l.status === "Interested").length;
   const followUpsDue = followUps.filter((f) => f.status === "Open").length;
   const closedDeals = deals.length;

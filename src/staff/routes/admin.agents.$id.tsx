@@ -48,6 +48,7 @@ import { db } from "@staff/lib/firebase";
 import { useAgentDoc } from "@staff/lib/agents-data";
 import { useLeads } from "@staff/lib/leads";
 import { useDeals } from "@staff/lib/deals-data";
+import { useCallLogs, callsByWeekday } from "@staff/lib/call-logs-data";
 import { useServices } from "@staff/lib/services-data";
 import { callToggleAgentStatus } from "@staff/lib/functions";
 import { formatZAR, formatDate, formatDateTime, initialsOf } from "@staff/lib/format";
@@ -135,10 +136,11 @@ function AgentProfile({ agent }: { agent: Agent }) {
   const { data: leads = [], isLoading: leadsLoading } = useLeads();
   const { data: deals = [], isLoading: dealsLoading } = useDeals();
   const { data: services = [] } = useServices();
+  const { data: callLogs = [] } = useCallLogs();
   const queryClient = useQueryClient();
   const [toggling, setToggling] = useState(false);
 
-  const stats = useMemo(() => computeAgentStats(agent, leads, deals), [agent, leads, deals]);
+  const stats = useMemo(() => computeAgentStats(agent, leads, deals, callLogs), [agent, leads, deals, callLogs]);
   const serviceOf = (id: string) => services.find((s) => s.id === id) ?? null;
 
   async function handleToggleStatus() {
@@ -154,14 +156,10 @@ function AgentProfile({ agent }: { agent: Agent }) {
     }
   }
 
-  const callsPerDay = useMemo(
-    () =>
-      ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, i) => ({
-        day,
-        calls: agent.callsThisWeek[i] ?? 0,
-      })),
-    [agent],
-  );
+  const callsPerDay = useMemo(() => {
+    const weekly = callsByWeekday(callLogs, agent.id);
+    return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, i) => ({ day, calls: weekly[i] ?? 0 }));
+  }, [agent, callLogs]);
 
   const revenueByMonth = useMemo(() => {
     const map = new Map<string, number>();

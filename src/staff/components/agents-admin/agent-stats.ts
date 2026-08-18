@@ -1,4 +1,5 @@
 import type { Agent, Deal, Lead } from "@staff/lib/types";
+import { countCallsToday, type CallLogRow } from "@staff/lib/call-logs-data";
 
 export interface AgentStats {
   agent: Agent;
@@ -16,7 +17,7 @@ export interface AgentStats {
   deals: Deal[];
 }
 
-export function computeAgentStats(agent: Agent, leads: Lead[], deals: Deal[]): AgentStats {
+export function computeAgentStats(agent: Agent, leads: Lead[], deals: Deal[], callLogs: CallLogRow[] = []): AgentStats {
   const agentLeads = leads.filter((l) => l.assignedAgentId === agent.id);
   const agentDeals = deals.filter((d) => d.agentId === agent.id);
   const closedWon = agentLeads.filter((l) => l.status === "Closed Won").length;
@@ -38,7 +39,9 @@ export function computeAgentStats(agent: Agent, leads: Lead[], deals: Deal[]): A
     interested,
     closedWon,
     closedLost,
-    callsToday: agent.callsToday,
+    // Real, derived from callLogs (written by logCall()) — agent.callsToday
+    // itself is never incremented by anything and is always 0 in production.
+    callsToday: countCallsToday(callLogs, agent.id),
     conversion,
     revenue,
     commission,

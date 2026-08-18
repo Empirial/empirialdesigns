@@ -8,7 +8,7 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 
 import { db, firebaseApp } from "./firebase";
 
@@ -60,10 +60,28 @@ export function hasStaffSession(): boolean {
   return typeof window !== "undefined" && window.sessionStorage.getItem(STAFF_SESSION_KEY) === "active";
 }
 
+/**
+ * Called on every successful sign-in path (password, Google, agent's first
+ * login after invite, mock/demo). Agents go online automatically here —
+ * no more remembering to flip a switch — and get a fresh lastActiveAt so
+ * autoOfflineIdleAgents (functions-staff/src/scheduled) doesn't immediately
+ * think they've gone idle. Best-effort and fire-and-forget: a write failure
+ * here shouldn't block sign-in, and mock/demo uids (mock-agent, mock-admin)
+ * are skipped since there's no real agents/{uid} doc for them.
+ */
 export function establishStaffSession(profile: UserProfile): void {
   if (typeof window !== "undefined") {
     window.sessionStorage.setItem(STAFF_SESSION_KEY, "active");
     window.sessionStorage.setItem("empirial_staff_role", profile.role);
+  }
+  if (profile.role === "agent" && !profile.uid.startsWith("mock-")) {
+    void updateDoc(doc(db, "agents", profile.uid), {
+      online: true,
+      lastActiveAt: serverTimestamp(),
+    }).catch(() => {
+      // Best-effort — e.g. a brand-new agent whose agents/{uid} doc hasn't
+      // finished being created by onUserCreate/inviteUser yet.
+    });
   }
 }
 
@@ -72,6 +90,16 @@ export function clearStaffSession(): void {
     window.sessionStorage.removeItem(STAFF_SESSION_KEY);
     window.sessionStorage.removeItem("empirial_staff_role");
   }
+}
+
+/**
+ * Heartbeat call while an agent has the app open — see AppShell. Keeps
+ * lastActiveAt fresh so autoOfflineIdleAgents doesn't flip a genuinely
+ * active session to offline after an hour.
+ */
+export function touchAgentActivity(uid: string): void {
+  if (uid.startsWith("mock-")) return;
+  void updateDoc(doc(db, "agents", uid), { lastActiveAt: serverTimestamp() }).catch(() => {});
 }
 
 export function startMockStaffSession(role: AppRole): UserProfile {
@@ -162,6 +190,17 @@ export async function signUpBootstrapAdmin(email: string, password: string): Pro
 }
 
 export async function signOutUser(): Promise<void> {
+  // Go offline before the auth state actually clears — firebaseAuth.currentUser
+  // is only valid up until signOut() resolves. Best-effort: a pure admin has
+  // no agents/{uid} doc, and any other failure shouldn't block signing out.
+  const uid = firebaseAuth.currentUser?.uid;
+  if (uid) {
+    try {
+      await updateDoc(doc(db, "agents", uid), { online: false });
+    } catch {
+      // Ignored — see comment above.
+    }
+  }
   clearStaffSession();
   clearMockStaffSession();
   await signOut(firebaseAuth);
