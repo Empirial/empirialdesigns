@@ -171,7 +171,13 @@ const CoverflowCard = ({ project, innerRef }: { project: CoverflowProject; inner
   // resolves, or forever if the target site has none / is unreachable.
   const preview = useLinkPreview(project.url);
   const [faviconFailed, setFaviconFailed] = useState(false);
+  const [previewImageFailed, setPreviewImageFailed] = useState(false);
   const description = preview?.description || project.type;
+  // The site's own Open Graph image (its real homepage/social preview) beats
+  // the curated stock art whenever it actually loads — falls back to the
+  // curated image while the preview is still resolving, if the site has no
+  // og:image, or if that image 404s.
+  const cardImage = preview?.image && !previewImageFailed ? preview.image : project.image;
 
   return (
     <div
@@ -179,7 +185,12 @@ const CoverflowCard = ({ project, innerRef }: { project: CoverflowProject; inner
       className="coverflow-card group relative shrink-0 snap-center overflow-hidden rounded-[28px] border border-white/10 bg-white/[.03] shadow-[0_20px_60px_rgba(0,0,0,.4)] transition-transform duration-300 ease-out"
     >
       <Wrapper {...wrapperProps} className="absolute inset-0 block">
-        <img src={project.image} alt={`${project.title} project`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <img
+          src={cardImage}
+          alt={`${project.title} project`}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          onError={() => setPreviewImageFailed(true)}
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
 
         {/* Site favicon, pulled live from the URL's own SEO metadata —
