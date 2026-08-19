@@ -73,6 +73,7 @@ import { useDeals } from "@staff/lib/deals-data";
 import { useCallLogs } from "@staff/lib/call-logs-data";
 import { formatZAR } from "@staff/lib/format";
 import { computeAgentStats } from "@staff/components/agents-admin/agent-stats";
+import { ReassignLeadsDialog } from "@staff/components/agents-admin/reassign-leads-dialog";
 import type { Agent } from "@staff/lib/types";
 import { cn } from "@staff/lib/utils";
 import { callInviteUser, callRemoveUser, callResetUserPassword, callToggleAgentStatus } from "@staff/lib/functions";
@@ -111,6 +112,7 @@ function PageAdminAgentsIndex() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [reassignTarget, setReassignTarget] = useState<Agent | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -464,7 +466,7 @@ function PageAdminAgentsIndex() {
                 pending={togglingId === s.agent.id}
                 resetting={resettingId === s.agent.id}
                 onToggleStatus={() => toggleStatus(s.agent)}
-                onReassign={() => toast.info(`Reassign leads for ${s.agent.name} — coming soon`)}
+                onReassign={() => setReassignTarget(s.agent)}
                 onResetPassword={() => handleResetPassword(s.agent)}
                 onDeactivate={() => setDeactivateTarget(s.agent)}
                 onRemove={() => setRemoveTarget(s.agent)}
@@ -480,6 +482,7 @@ function PageAdminAgentsIndex() {
                   <TableHead>Status</TableHead>
                   <TableHead>Live</TableHead>
                   <TableHead className="text-right">Leads</TableHead>
+                  <TableHead className="text-right">Left to call</TableHead>
                   <TableHead className="text-right">Calls today</TableHead>
                   <TableHead className="text-right">Interested</TableHead>
                   <TableHead className="text-right">Closed</TableHead>
@@ -514,6 +517,7 @@ function PageAdminAgentsIndex() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{s.leadsCount}</TableCell>
+                    <TableCell className="text-right tabular-nums">{s.remainingToCall}</TableCell>
                     <TableCell className="text-right tabular-nums">{s.callsToday}</TableCell>
                     <TableCell className="text-right tabular-nums">{s.interested}</TableCell>
                     <TableCell className="text-right tabular-nums">{s.closedWon}</TableCell>
@@ -537,9 +541,7 @@ function PageAdminAgentsIndex() {
                               View profile
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => toast.info(`Reassign leads for ${s.agent.name} — coming soon`)}
-                          >
+                          <DropdownMenuItem onClick={() => setReassignTarget(s.agent)}>
                             Reassign leads
                           </DropdownMenuItem>
                           <DropdownMenuItem
@@ -616,6 +618,14 @@ function PageAdminAgentsIndex() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ReassignLeadsDialog
+        open={!!reassignTarget}
+        onOpenChange={(o) => !o && setReassignTarget(null)}
+        sourceAgent={reassignTarget}
+        agents={agents}
+        leads={leads}
+      />
     </AppShell>
   );
 }
@@ -687,15 +697,21 @@ function AgentCard({
         {agent.online ? "Online now" : "Offline"}
       </div>
 
-      <div className="grid grid-cols-4 gap-2 text-center">
+      <div className="grid grid-cols-3 gap-2 text-center">
         <div>
           <p className="text-sm font-semibold tabular-nums">{stats.leadsCount}</p>
           <p className="text-[11px] text-muted-foreground">Leads</p>
         </div>
         <div>
+          <p className="text-sm font-semibold tabular-nums">{stats.remainingToCall}</p>
+          <p className="text-[11px] text-muted-foreground">Left to call</p>
+        </div>
+        <div>
           <p className="text-sm font-semibold tabular-nums">{stats.callsToday}</p>
           <p className="text-[11px] text-muted-foreground">Calls today</p>
         </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-center">
         <div>
           <p className="text-sm font-semibold tabular-nums">{stats.closedWon}</p>
           <p className="text-[11px] text-muted-foreground">Closed</p>

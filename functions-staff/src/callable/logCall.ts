@@ -16,6 +16,7 @@ const LEAD_STATUSES = [
   "Interested",
   "Follow-up",
   "Proposal Sent",
+  "Project in Progress",
   "Closed Won",
   "Closed Lost",
   "Not Interested",
@@ -27,6 +28,8 @@ interface LogCallInput {
   status: LeadStatus;
   note?: string;
   followUpAt?: string; // ISO timestamp
+  /** Service discussed with the prospect, including for non-closing outcomes. */
+  serviceId?: string;
   dealServiceId?: string;
   dealValue?: number;
 }
@@ -66,13 +69,17 @@ export const logCall = onCall<LogCallInput>(async (request) => {
       "Closed Won requires dealServiceId and a positive dealValue.",
     );
   }
+  if (data.serviceId && data.dealServiceId && data.serviceId !== data.dealServiceId) {
+    throw new HttpsError("invalid-argument", "The discussed service must match the deal service.");
+  }
 
   const leadRef = db.doc(`leads/${data.leadId}`);
   const noteRef = data.note?.trim() ? leadRef.collection("notes").doc() : null;
   const activityRef = leadRef.collection("activities").doc();
   const followUpRef = data.followUpAt ? db.collection("followUps").doc() : null;
   const dealRef = data.status === "Closed Won" ? db.collection("deals").doc() : null;
-  const serviceRef = data.dealServiceId ? db.doc(`services/${data.dealServiceId}`) : null;
+  const discussedServiceId = data.serviceId ?? data.dealServiceId;
+  const serviceRef = discussedServiceId ? db.doc(`services/${discussedServiceId}`) : null;
   const callerRef = db.doc(`staffUsers/${uid}`);
   // Lightweight record purely for aggregation (calls-per-day / calls-per-agent
   // charts) — cheaper and more robust than a collection-group query across
@@ -139,6 +146,7 @@ export const logCall = onCall<LogCallInput>(async (request) => {
 
     tx.update(leadRef, {
       status: data.status,
+      ...(discussedServiceId ? { serviceId: discussedServiceId } : {}),
       lastContact: now,
       nextFollowUp: data.followUpAt ? Timestamp.fromDate(new Date(data.followUpAt)) : null,
       updatedAt: now,
@@ -205,6 +213,15 @@ export const logCall = onCall<LogCallInput>(async (request) => {
           recipientUid: adminUid,
           title: "Deal closed",
           detail: `${actorName} closed ${lead.business} — R${data.dealValue.toLocaleString("en-ZA")}.`,
+          tone: "success",
+        });
+      }
+
+      if (lead.assignedAgentUid) {
+        writeNotification(tx, {
+          recipientUid: lead.assignedAgentUid as string,
+          title: "Commission earned",
+          detail: `${lead.business} has been closed. You earned R${commission.toLocaleString("en-ZA")} commission.`,
           tone: "success",
         });
       }

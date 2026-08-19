@@ -34,6 +34,8 @@ export interface LogCallInput {
   // that produce `T | undefined`, which needs the property type to say so.
   note?: string | undefined;
   followUpAt?: string | undefined;
+  /** Service discussed on the call; persisted to the lead for pipeline visibility. */
+  serviceId?: string | undefined;
   dealServiceId?: string | undefined;
   dealValue?: number | undefined;
 }

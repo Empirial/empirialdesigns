@@ -25,6 +25,7 @@ import {
 } from "@staff/components/ui/dropdown-menu";
 import { useAgents } from "@staff/lib/agents-data";
 import { useLeads } from "@staff/lib/leads";
+import { useServices } from "@staff/lib/services-data";
 import type { Agent, Lead, LeadStatus } from "@staff/lib/types";
 import { formatZAR, relativeTime, formatDate, isOverdue } from "@staff/lib/format";
 
@@ -47,6 +48,7 @@ const COLUMNS: { key: string; label: string; statuses: LeadStatus[] }[] = [
   { key: "interested", label: "Interested", statuses: ["Interested"] },
   { key: "followup", label: "Follow-up", statuses: ["Follow-up"] },
   { key: "proposal", label: "Proposal Sent", statuses: ["Proposal Sent"] },
+  { key: "project", label: "Project in Progress", statuses: ["Project in Progress"] },
   { key: "won", label: "Closed Won", statuses: ["Closed Won"] },
   { key: "lost", label: "Closed Lost", statuses: ["Closed Lost", "Not Interested"] },
 ];
@@ -56,11 +58,17 @@ const ALL = "all";
 function PageAdminPipeline() {
   const { data: leads = [] } = useLeads();
   const { data: agents = [] } = useAgents();
+  const { data: services = [] } = useServices();
   const [search, setSearch] = useState("");
   const [agentFilter, setAgentFilter] = useState(ALL);
   const [onlyUnassigned, setOnlyUnassigned] = useState(false);
 
   const agentOf = (id: string | null) => agents.find((a) => a.id === id) ?? null;
+  const serviceNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const service of services) map.set(service.id, service.name);
+    return map;
+  }, [services]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -142,6 +150,7 @@ function PageAdminPipeline() {
                         key={lead.id}
                         lead={lead}
                         agent={agentOf(lead.assignedAgentId)}
+                        serviceName={lead.serviceId ? serviceNames.get(lead.serviceId) ?? "Unknown service" : "Service not selected"}
                       />
                     ))
                   )}
@@ -158,9 +167,11 @@ function PageAdminPipeline() {
 function PipelineCard({
   lead,
   agent,
+  serviceName,
 }: {
   lead: Lead;
   agent: Agent | null;
+  serviceName: string;
 }) {
   const overdue = isOverdue(lead.nextFollowUp);
 
@@ -179,8 +190,8 @@ function PipelineCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <Link to="/agent/leads/$id" params={{ id: lead.id }}>
-                <Eye className="mr-2 size-4" /> Open lead
+              <Link to="/admin/leads">
+                <Eye className="mr-2 size-4" /> Manage lead
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => toast.info("Open the Assign dialog from the Leads table")}>
@@ -192,7 +203,7 @@ function PipelineCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <p className="text-sm font-semibold tabular-nums text-primary">{formatZAR(lead.value)}</p>
+      <p className="text-sm font-medium text-primary">{serviceName}</p>
       <div className="flex items-center justify-between gap-2">
         {agent ? <AvatarChip name={agent.name} size="sm" /> : <UnassignedChip />}
         <span className="shrink-0 text-[11px] text-muted-foreground">{relativeTime(lead.lastContact)}</span>

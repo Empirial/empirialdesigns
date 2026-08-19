@@ -14,6 +14,7 @@ const LEAD_STATUSES = [
   "Interested",
   "Follow-up",
   "Proposal Sent",
+  "Project in Progress",
   "Closed Won",
   "Closed Lost",
   "Not Interested",

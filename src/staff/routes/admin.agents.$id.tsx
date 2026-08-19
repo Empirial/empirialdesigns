@@ -45,7 +45,7 @@ import {
   Repeat,
 } from "lucide-react";
 import { db } from "@staff/lib/firebase";
-import { useAgentDoc } from "@staff/lib/agents-data";
+import { useAgentDoc, useAgents } from "@staff/lib/agents-data";
 import { useLeads } from "@staff/lib/leads";
 import { useDeals } from "@staff/lib/deals-data";
 import { useCallLogs, callsByWeekday } from "@staff/lib/call-logs-data";
@@ -53,6 +53,7 @@ import { useServices } from "@staff/lib/services-data";
 import { callToggleAgentStatus } from "@staff/lib/functions";
 import { formatZAR, formatDate, formatDateTime, initialsOf } from "@staff/lib/format";
 import { computeAgentStats } from "@staff/components/agents-admin/agent-stats";
+import { ReassignLeadsDialog } from "@staff/components/agents-admin/reassign-leads-dialog";
 import type { Agent, ActivityItem } from "@staff/lib/types";
 
 export const Route = createFileRoute("/admin/agents/$id")({
@@ -137,8 +138,10 @@ function AgentProfile({ agent }: { agent: Agent }) {
   const { data: deals = [], isLoading: dealsLoading } = useDeals();
   const { data: services = [] } = useServices();
   const { data: callLogs = [] } = useCallLogs();
+  const { data: agents = [] } = useAgents();
   const queryClient = useQueryClient();
   const [toggling, setToggling] = useState(false);
+  const [reassignOpen, setReassignOpen] = useState(false);
 
   const stats = useMemo(() => computeAgentStats(agent, leads, deals, callLogs), [agent, leads, deals, callLogs]);
   const serviceOf = (id: string) => services.find((s) => s.id === id) ?? null;
@@ -286,7 +289,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
                 onCheckedChange={handleToggleStatus}
               />
             </div>
-            <Button variant="outline" onClick={() => toast.info(`Reassign leads for ${agent.name} — coming soon`)}>
+            <Button variant="outline" onClick={() => setReassignOpen(true)}>
               <Repeat className="size-4" />
               Reassign leads
             </Button>
@@ -299,8 +302,9 @@ function AgentProfile({ agent }: { agent: Agent }) {
           </div>
         </div>
 
-        <KpiGrid>
+        <KpiGrid className="sm:grid-cols-2 xl:grid-cols-5">
           <KpiCard label="Leads assigned" value={stats.leadsCount} icon={Users} tone="primary" />
+          <KpiCard label="Left to call" value={stats.remainingToCall} icon={PhoneCall} tone="warning" />
           <KpiCard label="Calls today" value={stats.callsToday} icon={PhoneCall} />
           <KpiCard label="Connect rate" value={`${connectRate}%`} icon={TrendingUp} />
           <KpiCard label="Conversion" value={`${stats.conversion}%`} icon={TrendingUp} tone="success" />
@@ -547,6 +551,14 @@ function AgentProfile({ agent }: { agent: Agent }) {
           </TabsContent>
         </Tabs>
       </div>
+
+      <ReassignLeadsDialog
+        open={reassignOpen}
+        onOpenChange={setReassignOpen}
+        sourceAgent={agent}
+        agents={agents}
+        leads={leads}
+      />
     </AppShell>
   );
 }

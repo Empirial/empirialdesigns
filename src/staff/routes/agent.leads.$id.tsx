@@ -82,7 +82,7 @@ const CALL_OUTCOMES: LeadStatus[] = [
   "Follow-up",
   "Called",
   "Proposal Sent",
-  "Closed Won",
+  "Project in Progress",
   "Closed Lost",
 ];
 
@@ -95,6 +95,7 @@ const CALL_OUTCOMES: LeadStatus[] = [
 const QUICK_STATUS_OPTIONS: { value: LeadStatus; label: string }[] = [
   { value: "Follow-up", label: "Follow-up" },
   { value: "Interested", label: "Interested" },
+  { value: "Project in Progress", label: "Project in progress" },
   { value: "Not Interested", label: "Not Interested" },
 ];
 
@@ -130,12 +131,16 @@ function PageAgentLeadsId() {
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>(undefined);
   const [followUpTime, setFollowUpTime] = useState<string>("");
   const [dealServiceId, setDealServiceId] = useState<string>(lead?.serviceId ?? "");
-  const [dealValue, setDealValue] = useState<string>(String(lead?.value ?? ""));
   const [newNote, setNewNote] = useState("");
   const [scriptCategory, setScriptCategory] = useState<string>("all");
   const [openScriptId, setOpenScriptId] = useState<string | null>(null);
   const [savingCall, setSavingCall] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
+
+  useEffect(() => {
+    if (!lead?.serviceId) return;
+    setDealServiceId(lead.serviceId);
+  }, [lead?.id]);
 
   if (leadLoading) {
     return (
@@ -206,8 +211,9 @@ function PageAgentLeadsId() {
         status: outcome,
         note: note.trim() || undefined,
         followUpAt,
-        dealServiceId: outcome === "Closed Won" ? dealServiceId || undefined : undefined,
-        dealValue: outcome === "Closed Won" ? Number(dealValue) || undefined : undefined,
+        serviceId: dealServiceId || undefined,
+        dealServiceId: undefined,
+        dealValue: undefined,
       });
       invalidateLeadQueries(queryClient, lead.id);
       toast.success("Call logged successfully");
@@ -411,10 +417,10 @@ function PageAgentLeadsId() {
                     </div>
                   </div>
                 ) : null}
-                {outcome === "Closed Won" ? (
-                  <div className="grid grid-cols-2 gap-3">
+                {(["Interested", "Follow-up", "Proposal Sent", "Project in Progress"] as LeadStatus[]).includes(outcome) ? (
+                  <div className="grid gap-3">
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground">Service</label>
+                      <label className="text-xs font-medium text-muted-foreground">Service discussed</label>
                       <Select value={dealServiceId} onValueChange={setDealServiceId}>
                         <SelectTrigger className="mt-1 w-full"><SelectValue placeholder="Select service" /></SelectTrigger>
                         <SelectContent>
@@ -423,15 +429,6 @@ function PageAgentLeadsId() {
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Deal value (R)</label>
-                      <Input
-                        type="number"
-                        value={dealValue}
-                        onChange={(e) => setDealValue(e.target.value)}
-                        className="mt-1"
-                      />
                     </div>
                   </div>
                 ) : null}
@@ -608,8 +605,7 @@ function PageAgentLeadsId() {
                     className="mt-2 w-full"
                     onClick={() => {
                       setDealServiceId(s.id);
-                      setDealValue(String(s.promoPrice));
-                      setOutcome("Closed Won");
+                      setOutcome("Project in Progress");
                       setShowOutcomeForm(true);
                       toast.info(`Quoted ${s.name} at ${formatZAR(s.promoPrice)}`);
                     }}

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { SiteNavigation, SiteFooter } from '@/features/marketing/EmpirialSite';
 import geometricBg from '@/assets/Brand ID/generated/empirial-geometric-bg.webp'; // 98% smaller than the original .png
 import BrandIcon from '@/components/BrandIcon';
+import useSystemTheme from '@/features/marketing/hooks/useSystemTheme';
 
 const suggestions = [
   'Build my business a modern website',
@@ -18,6 +19,7 @@ const WHATSAPP_NUMBER = '27651859143';
 
 const PublicHome = () => {
   const [prompt, setPrompt] = useState('');
+  const isDark = useSystemTheme();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -28,18 +30,19 @@ const PublicHome = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#050508] text-white">
+    <div className={isDark ? 'dark' : ''}>
+    <div className="min-h-screen bg-[#f5f1eb] text-[#191521] transition-colors duration-500 dark:bg-[#050508] dark:text-white">
       <SiteNavigation />
       <main>
         <section className="relative isolate flex h-screen min-h-[720px] items-center overflow-hidden px-6 pb-8 pt-24">
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_25%,rgba(102,32,204,.3),transparent_38%),linear-gradient(180deg,#090811_0%,#050508_90%)]" />
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_25%,rgba(168,85,247,.16),transparent_45%),linear-gradient(180deg,#faf6f0_0%,#f5f1eb_90%)] dark:bg-[radial-gradient(circle_at_50%_25%,rgba(102,32,204,.3),transparent_38%),linear-gradient(180deg,#090811_0%,#050508_90%)]" />
           <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-10" style={{ backgroundImage: `url(${geometricBg})` }} />
           <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
             <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="w-full">
               <BrandIcon size={44} className="mx-auto mb-4" />
-              <p className="mb-2.5 text-xs font-semibold uppercase tracking-[.24em] text-[#b56cff]">Digital studio · South Africa</p>
+              <p className="mb-2.5 text-xs font-semibold uppercase tracking-[.24em] text-[#7c2cff] dark:text-[#b56cff]">Digital studio · South Africa</p>
               <h1 className="mx-auto max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-.05em] sm:text-6xl lg:text-7xl">What will we <span className="text-[#a855f7]">build</span> together?</h1>
-              <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-white/50 sm:text-lg">Tell EMPIRIAL what you are imagining. We turn ambitious ideas into websites, apps, automation, and brands that move businesses forward.</p>
+              <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-[#191521]/50 dark:text-white/50 sm:text-lg">Tell EMPIRIAL what you are imagining. We turn ambitious ideas into websites, apps, automation, and brands that move businesses forward.</p>
               <div className="relative mx-auto mt-6 w-full max-w-3xl">
                 {/* "Sticker" badge — the AI builder itself isn't live yet, so the
                     prompt box below hands off to WhatsApp instead of pretending
@@ -47,17 +50,17 @@ const PublicHome = () => {
                 <span className="absolute -top-3.5 right-4 z-10 rotate-3 rounded-full bg-[#8138ff] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-[0_8px_24px_rgba(129,56,255,.5)] sm:right-6">
                   <Sparkles className="mr-1 inline h-3 w-3 -translate-y-px" /> AI Builder — Coming Soon
                 </span>
-                <form onSubmit={submit} className="flex w-full flex-col rounded-[1.6rem] border border-white/15 bg-white/[.07] p-4 text-left shadow-[0_20px_70px_rgba(0,0,0,.3)] backdrop-blur-2xl transition focus-within:border-[#a855f7]/60 focus-within:bg-white/[.1]">
-                  <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Describe what you want to build" rows={2} placeholder="Describe what you want to build..." className="min-h-[64px] w-full resize-none bg-transparent px-2 pt-1 text-base text-white outline-none placeholder:text-white/35" />
-                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
-                    <div className="flex items-center gap-1 text-white/45"><button type="button" aria-label="Add an attachment" className="grid h-9 w-9 place-items-center rounded-full transition hover:bg-white/10 hover:text-white"><Plus className="h-4 w-4" /></button><span className="hidden text-xs sm:inline">Start with an idea</span></div>
-                    <div className="flex items-center gap-2"><button type="button" aria-label="Use voice input" className="grid h-9 w-9 place-items-center rounded-full text-white/45 transition hover:bg-white/10 hover:text-white"><Mic className="h-4 w-4" /></button><button type="submit" disabled={!prompt.trim()} aria-label="Send your idea to WhatsApp" className="grid h-9 w-9 place-items-center rounded-full bg-white text-black transition hover:bg-[#d9c4ff] disabled:cursor-not-allowed disabled:opacity-30"><ArrowRight className="h-4 w-4" /></button></div>
+                <form onSubmit={submit} className="flex w-full flex-col rounded-[1.6rem] border border-black/15 dark:border-white/15 bg-black/[.07] dark:bg-white/[.07] p-4 text-left shadow-[0_20px_70px_rgba(0,0,0,.3)] backdrop-blur-2xl transition focus-within:border-[#a855f7]/60 focus-within:bg-black/[.1] dark:focus-within:bg-white/[.1]">
+                  <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Describe what you want to build" rows={2} placeholder="Describe what you want to build..." className="min-h-[64px] w-full resize-none bg-transparent px-2 pt-1 text-base text-[#191521] dark:text-white outline-none placeholder:text-[#191521]/35 dark:placeholder:text-white/35" />
+                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-black/10 dark:border-white/10 pt-3">
+                    <div className="flex items-center gap-1 text-[#191521]/45 dark:text-white/45"><button type="button" aria-label="Add an attachment" className="grid h-9 w-9 place-items-center rounded-full transition hover:bg-black/10 dark:hover:bg-white/10 hover:text-[#191521] dark:hover:text-white"><Plus className="h-4 w-4" /></button><span className="hidden text-xs sm:inline">Start with an idea</span></div>
+                    <div className="flex items-center gap-2"><button type="button" aria-label="Use voice input" className="grid h-9 w-9 place-items-center rounded-full text-[#191521]/45 dark:text-white/45 transition hover:bg-black/10 dark:hover:bg-white/10 hover:text-[#191521] dark:hover:text-white"><Mic className="h-4 w-4" /></button><button type="submit" disabled={!prompt.trim()} aria-label="Send your idea to WhatsApp" className="grid h-9 w-9 place-items-center rounded-full bg-[#191521] text-white transition hover:bg-[#2a2438] disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white dark:text-black dark:hover:bg-[#d9c4ff]"><ArrowRight className="h-4 w-4" /></button></div>
                   </div>
                 </form>
-                <p className="mt-2 text-center text-xs text-white/35">Sends straight to our WhatsApp — a real person replies.</p>
+                <p className="mt-2 text-center text-xs text-[#191521]/35 dark:text-white/35">Sends straight to our WhatsApp — a real person replies.</p>
               </div>
-              <div className="mt-4 flex flex-wrap justify-center gap-2">{suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => setPrompt(suggestion)} className="rounded-full border border-white/10 bg-white/[.04] px-3.5 py-2 text-xs text-white/55 transition hover:border-white/25 hover:bg-white/[.09] hover:text-white">{suggestion}</button>)}</div>
-              <Link to="/portfolio" className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-white/55 transition hover:text-white">
+              <div className="mt-4 flex flex-wrap justify-center gap-2">{suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => setPrompt(suggestion)} className="rounded-full border border-black/10 dark:border-white/10 bg-black/[.04] dark:bg-white/[.04] px-3.5 py-2 text-xs text-[#191521]/55 dark:text-white/55 transition hover:border-black/25 dark:hover:border-white/25 hover:bg-black/[.09] dark:hover:bg-white/[.09] hover:text-[#191521] dark:hover:text-white">{suggestion}</button>)}</div>
+              <Link to="/portfolio" className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-[#191521]/55 dark:text-white/55 transition hover:text-[#191521] dark:hover:text-white">
                 Not sure yet? Check out our portfolio <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </motion.div>
@@ -65,6 +68,7 @@ const PublicHome = () => {
         </section>
       </main>
       <SiteFooter />
+    </div>
     </div>
   );
 };

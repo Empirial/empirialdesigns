@@ -54,7 +54,7 @@ export const Route = createFileRoute("/agent/leads/")({
 });
 
 const ALL = "all";
-const STATUS_CHIPS = ["Not Called", "Called", "Interested", "Follow-up", "Proposal Sent", "Closed Won"] as const;
+const STATUS_CHIPS = ["Not Called", "Called", "Interested", "Follow-up", "Proposal Sent", "Project in Progress", "Closed Won"] as const;
 
 function PageAgentLeadsIndex() {
   const { data: myLeads = [], isLoading, error } = useMyLeads();
