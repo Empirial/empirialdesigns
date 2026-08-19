@@ -29,3 +29,8 @@ dist-ssr
 vite.config.ts.timestamp-*
 .claude/settings.local.json
 .tanstack
+
+# Full-page portfolio screenshots — marketing team handoff assets, not
+# app assets. The hero-crop versions used in the app live in
+# src/assets/portfolio/ instead and ARE tracked.
+/marketing-assets/portfolio-screenshots/

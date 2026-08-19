@@ -11,6 +11,7 @@ import { TablePagination } from "@staff/components/shared/table-pagination";
 import { AvatarChip, UnassignedChip } from "@staff/components/shared/avatar-chip";
 import { StatusBadge } from "@staff/components/shared/status-badge";
 import { LeadFormDialog, type LeadFormPatch } from "@staff/components/leads-admin/lead-form-dialog";
+import { LeadPreviewDialog } from "@staff/components/leads-admin/lead-preview-dialog";
 import { INDUSTRIES, LOCATIONS } from "@staff/components/leads-admin/constants";
 import { Button } from "@staff/components/ui/button";
 import { Input } from "@staff/components/ui/input";
@@ -121,6 +122,7 @@ function PageAdminLeads() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const [editLead, setEditLead] = useState<Lead | null>(null);
+  const [previewLead, setPreviewLead] = useState<Lead | null>(null);
   const [assignTarget, setAssignTarget] = useState<Lead | string[] | null>(null);
   const [assignAgentId, setAssignAgentId] = useState<string>("");
   const [deleteTarget, setDeleteTarget] = useState<string[] | null>(null);
@@ -141,7 +143,7 @@ function PageAdminLeads() {
   useEffect(() => {
     if (!leadId || loading) return;
     const match = leads.find((l) => l.id === leadId);
-    if (match) setEditLead(match);
+    if (match) setPreviewLead(match);
     navigate({ search: (prev) => ({ ...prev, leadId: undefined }), replace: true });
   }, [leadId, leads, loading, navigate]);
 
@@ -551,7 +553,13 @@ function PageAdminLeads() {
                           <Checkbox checked={selected.has(lead.id)} onCheckedChange={(c) => toggleRow(lead.id, !!c)} />
                         </TableCell>
                         <TableCell>
-                          <p className="font-medium">{lead.business}</p>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewLead(lead)}
+                            className="text-left font-medium hover:underline focus-visible:underline focus-visible:outline-none"
+                          >
+                            {lead.business}
+                          </button>
                           <p className="text-xs text-muted-foreground">{lead.contactPerson}</p>
                         </TableCell>
                         <TableCell>
@@ -579,8 +587,8 @@ function PageAdminLeads() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => setEditLead(lead)}>
-                                <Eye className="mr-2 size-4" /> View / edit details
+                              <DropdownMenuItem onClick={() => setPreviewLead(lead)}>
+                                <Eye className="mr-2 size-4" /> View lead
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setEditLead(lead)}>
                                 <Pencil className="mr-2 size-4" /> Edit
@@ -649,6 +657,27 @@ function PageAdminLeads() {
           onSubmit={handleUpdateLead}
         />
       ) : null}
+
+      <LeadPreviewDialog
+        lead={previewLead}
+        open={!!previewLead}
+        onOpenChange={(o) => !o && setPreviewLead(null)}
+        agent={previewLead ? agentOf(previewLead.assignedAgentId) : null}
+        service={previewLead ? serviceOf(previewLead.serviceId) : null}
+        onEdit={() => {
+          const lead = previewLead;
+          setPreviewLead(null);
+          if (lead) setEditLead(lead);
+        }}
+        onAssign={() => {
+          const lead = previewLead;
+          setPreviewLead(null);
+          if (lead) {
+            setAssignTarget(lead);
+            setAssignAgentId(lead.assignedAgentId ?? "");
+          }
+        }}
+      />
 
       <Dialog
         open={!!assignTarget}

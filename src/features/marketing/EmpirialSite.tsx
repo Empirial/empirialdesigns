@@ -1,12 +1,34 @@
 import { FormEvent, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowRight, Bot, Check, ChevronDown, Code2, Globe2, Megaphone, Menu, MessageCircle, Palette, ShieldCheck, ShoppingCart, Smartphone, Sparkles, X } from 'lucide-react';
-import robotPortraits from '@/assets/Brand ID/generated/empirial-robot-closeup.webp';
+import { ArrowRight, Bot, Check, ChevronDown, Code2, Globe2, Megaphone, Menu, MessageCircle, ShieldCheck, ShoppingCart, Smartphone, X } from 'lucide-react';
 import humanRobot from '@/assets/Brand ID/generated/empirial-human-robot.webp';
 import workspace from '@/assets/Brand ID/generated/empirial-workspace.webp';
 import brandBoard from '@/assets/Brand ID/generated/empirial-brand-stage.webp';
-import aiAutomation from '@/assets/Brand ID/generated/empirial-ai-automation.webp';
-import portfolioVisual from '@/assets/Brand ID/generated/empirial-portfolio.webp';
+// Real above-the-fold screenshots of each live client site — captured with
+// Playwright, replacing the shared stock-art pool below as the curated
+// fallback PortfolioCoverflow shows when a live og:image isn't available.
+import smiteTradeHero from '@/assets/portfolio/smite-trade-hero.jpg';
+import mrpdfHero from '@/assets/portfolio/mrpdf-hero.jpg';
+import careergateHero from '@/assets/portfolio/careergate-hero.jpg';
+import zionHero from '@/assets/portfolio/zion-hero.jpg';
+import samtambaniHero from '@/assets/portfolio/samtambani-hero.jpg';
+import littleSaintsHero from '@/assets/portfolio/little-saints-hero.jpg';
+import mBendlaMAttorneysHero from '@/assets/portfolio/m-bendla-m-attorneys-hero.jpg';
+import nnaElectricalsHero from '@/assets/portfolio/nna-electricals-hero.jpg';
+import mphelaIndustriesHero from '@/assets/portfolio/mphela-industries-hero.jpg';
+import gogoCarwashHero from '@/assets/portfolio/gogo-carwash-hero.jpg';
+import bongsKitchenHero from '@/assets/portfolio/bongs-kitchen-hero.jpg';
+import empirialQuizinesHero from '@/assets/portfolio/empirial-quizines-hero.jpg';
+import empirialAcademyHero from '@/assets/portfolio/empirial-academy-hero.jpg';
+import uresureHero from '@/assets/portfolio/uresure-hero.jpg';
+import ytShikaAttorneysHero from '@/assets/portfolio/yt-shika-attorneys-hero.jpg';
+import empirialCoffeeHero from '@/assets/portfolio/empirial-coffee-hero.jpg';
+import empirialEstateHero from '@/assets/portfolio/empirial-estate-hero.jpg';
+import empirialPastryHero from '@/assets/portfolio/empirial-pastry-hero.jpg';
+import empirialAttorneysHero from '@/assets/portfolio/empirial-attorneys-hero.jpg';
+import missEmpirialSaHero from '@/assets/portfolio/miss-empirial-sa-hero.jpg';
+import siyaleleProjectsHero from '@/assets/portfolio/siyalele-projects-hero.jpg';
+import pitchlyHero from '@/assets/portfolio/pitchly-hero.jpg';
 import BrandIcon from '@/components/BrandIcon';
 import PortfolioCoverflow from '@/features/marketing/components/PortfolioCoverflow';
 
@@ -64,47 +86,141 @@ export const SiteFooter = () => <footer className="border-t border-white/10 bg-[
 const Page = ({ children }: { children: ReactNode }) => <div className="min-h-screen bg-[#050508] text-white"><SiteNavigation /><main>{children}</main><SiteFooter /></div>;
 const Eyebrow = ({ children }: { children: ReactNode }) => <p className="mb-4 text-xs font-semibold uppercase tracking-[.24em] text-[#b56cff]">{children}</p>;
 
+// Mirrors EmpirialDesigns_Service_Packages.pdf (the real, current service
+// catalogue) exactly — same six services, same feature labels, same tier
+// names — so the public Services page matches what's actually being sold
+// instead of drifting from its own separate copy.
 const services = [
-  { icon: Globe2, title: 'Business Website', text: 'A professional home online — core pages, a Google listing set up properly, map integration, and a quote form. Once-off, from R2,500.' },
-  { icon: ShoppingCart, title: 'E-Commerce Website', text: 'Everything in the Business Website, plus a full catalog, secure payments, receipts, and an owner dashboard to run it yourself. Once-off, priced per project.' },
-  { icon: Smartphone, title: 'Application Development', text: 'A web or mobile app built around how you work — accounts, an admin dashboard, integrations, and full hosting and launch. Once-off, priced per project.' },
-  { icon: Code2, title: 'Custom Software Development', text: 'A system designed around your exact workflow — reporting, a client/staff portal, integrations, and automation. Once-off, priced per project.' },
-  { icon: Bot, title: 'AI Automation', text: 'Custom AI agents that do real work, from one automated task to a full multi-agent system. Monthly, Starter / Smart / Elite.' },
-  { icon: Megaphone, title: 'SEO & Social Media Management', text: 'Get found on Google and stay visible on social — listing management, posting, rank tracking, and reporting. Monthly, three packages.' },
-  { icon: Palette, title: 'Poster Design', text: 'A single professionally designed poster, flyer or social graphic — print-ready and social-ready. Once-off, from R250.' },
+  {
+    icon: Globe2,
+    title: 'Business Website',
+    cadence: 'Once-off',
+    text: 'Your professional home online.',
+    features: ['Core Pages', 'Call-to-Action', 'Google Listing', 'Map Integration', 'Mobile Friendly', 'Quote Requests', 'AI & SEO Ready'],
+  },
+  {
+    icon: ShoppingCart,
+    title: 'E-Commerce Website',
+    cadence: 'Once-off',
+    text: 'Sell online, 24/7. Includes everything in the Business Website, plus:',
+    features: ['Catalog', 'Payments', 'Receipts', 'Owner Dashboard', 'Checkout'],
+  },
+  {
+    icon: Smartphone,
+    title: 'Application Development',
+    cadence: 'Once-off',
+    text: 'A custom app built around how you work.',
+    features: ['Custom Design', 'User Accounts', 'Admin Dashboard', 'Integrations', 'Notifications', 'Hosting & Launch'],
+  },
+  {
+    icon: Code2,
+    title: 'Custom Software Development',
+    cadence: 'Once-off, priced per project',
+    text: 'A system built specifically for your business.',
+    features: ['Custom Build', 'Reporting', 'Client/Staff Portal', 'Integration', 'Automation', 'Maintenance'],
+  },
+  {
+    icon: Bot,
+    title: 'AI Automation',
+    cadence: 'Monthly',
+    text: 'Custom AI agents built to do real work — for businesses and individuals.',
+    features: [],
+    tiers: [
+      { name: 'Starter', blurb: 'One task, automated' },
+      { name: 'Smart', blurb: 'Multiple tasks, working together' },
+      { name: 'Elite', blurb: 'A full AI agent system' },
+    ],
+  },
+  {
+    icon: Megaphone,
+    title: 'SEO & Social Media Management',
+    cadence: 'Monthly',
+    text: 'Get found, stay visible.',
+    features: [],
+    tiers: [
+      { name: 'Package ①', blurb: 'Get found on Google' },
+      { name: 'Package ②', blurb: 'Steady growth' },
+      { name: 'Package ③', blurb: 'Full management' },
+    ],
+  },
 ];
 
 const Process = () => <section className="mx-auto max-w-7xl px-6 py-24"><Eyebrow>Our approach</Eyebrow><div className="grid gap-10 md:grid-cols-[.8fr_1.2fr]"><h2 className="text-4xl font-semibold tracking-tight md:text-5xl">Strategy. Design. Build. <span className={purple}>Scale.</span></h2><div className="grid gap-5 sm:grid-cols-4">{[['01','Discover','We learn your goals, audience, and opportunity.'],['02','Design','We shape the right experience and visual system.'],['03','Build','We create clean, fast, robust digital products.'],['04','Scale','We launch, optimise, and help you grow.']].map(([n,t,d]) => <div key={n} className="border-t border-white/15 pt-4"><span className="text-sm text-[#b56cff]">{n}</span><h3 className="mt-5 font-semibold">{t}</h3><p className="mt-2 text-sm leading-6 text-white/45">{d}</p></div>)}</div></div></section>;
 
-export const ServicesPage = () => <Page><section className="px-6 pb-20 pt-36"><div className="mx-auto max-w-7xl"><Eyebrow>Capabilities</Eyebrow><h1 className="max-w-4xl text-5xl font-semibold tracking-tight sm:text-7xl">Digital solutions built for <span className={purple}>ambitious businesses.</span></h1><p className="mt-7 max-w-2xl text-lg leading-8 text-white/55">From your first landing page to the systems that run your growth, EMPIRIAL brings strategy, design, and technology together.</p></div></section><section className="mx-auto max-w-7xl px-6 pb-24"><div className="grid gap-4">{services.map(({icon: Icon,title,text},i) => <div key={title} className="grid gap-6 rounded-2xl border border-white/10 bg-white/[.03] p-7 md:grid-cols-[80px_1fr_auto] md:items-center"><div className="grid h-14 w-14 place-items-center rounded-xl bg-[#7c2cff]/15 text-[#b56cff]"><Icon /></div><div><p className="mb-2 text-xs text-[#b56cff]">0{i+1}</p><h2 className="text-2xl font-semibold">{title}</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-white/50">{text}</p></div><Link to="/contact" className="text-sm font-semibold text-white/70 hover:text-white">Discuss this <ArrowRight className="ml-1 inline h-4 w-4" /></Link></div>)}</div></section><Process /></Page>;
+const ServiceCard = ({
+  service,
+  index,
+}: {
+  service: (typeof services)[number];
+  index: number;
+}) => {
+  const Icon = service.icon;
+  return (
+    <div className="grid gap-6 rounded-2xl border border-white/10 bg-white/[.03] p-7 md:grid-cols-[80px_1fr_auto] md:items-start">
+      <div className="grid h-14 w-14 place-items-center rounded-xl bg-[#7c2cff]/15 text-[#b56cff]">
+        <Icon />
+      </div>
+      <div>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-xs text-[#b56cff]">0{index + 1}</p>
+          <h2 className="text-2xl font-semibold">{service.title}</h2>
+          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-white/45">{service.cadence}</span>
+        </div>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-white/50">{service.text}</p>
+        {service.features.length > 0 ? (
+          <ul className="mt-4 flex flex-wrap gap-2">
+            {service.features.map((f) => (
+              <li key={f} className="rounded-lg border border-white/10 bg-white/[.02] px-3 py-1.5 text-xs text-white/60">{f}</li>
+            ))}
+          </ul>
+        ) : null}
+        {service.tiers ? (
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            {service.tiers.map((tier) => (
+              <div key={tier.name} className="rounded-lg border border-white/10 bg-white/[.02] px-3 py-2.5">
+                <p className="text-xs font-semibold text-white">{tier.name}</p>
+                <p className="mt-0.5 text-xs text-white/45">{tier.blurb}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      <Link to="/contact" className="text-sm font-semibold text-white/70 hover:text-white md:self-center">
+        Discuss this <ArrowRight className="ml-1 inline h-4 w-4" />
+      </Link>
+    </div>
+  );
+};
+
+export const ServicesPage = () => <Page><section className="px-6 pb-20 pt-36"><div className="mx-auto max-w-7xl"><Eyebrow>Capabilities</Eyebrow><h1 className="max-w-4xl text-5xl font-semibold tracking-tight sm:text-7xl">Digital solutions built for <span className={purple}>ambitious businesses.</span></h1><p className="mt-7 max-w-2xl text-lg leading-8 text-white/55">From your first landing page to the systems that run your growth, EMPIRIAL brings strategy, design, and technology together.</p></div></section><section className="mx-auto max-w-7xl px-6 pb-24"><div className="grid gap-4">{services.map((service, i) => <ServiceCard key={service.title} service={service} index={i} />)}</div></section><Process /></Page>;
 
 const projects = [
-  { title: 'Smite Trade', category: 'Websites', type: 'Trading platform · Website · Product design', image: portfolioVisual, url: 'https://smitetratde.co.za' },
-  { title: 'MrPDF', category: 'Apps', type: 'Document platform · Website · App', image: aiAutomation, url: 'https://mrpdf.co.za' },
-  { title: 'CareerGate', category: 'Websites', type: 'Career platform · Website · Digital experience', image: humanRobot, url: 'https://careergate.co.za' },
+  { title: 'Smite Trade', category: 'Websites', type: 'Trading platform · Website · Product design', image: smiteTradeHero, url: 'https://smitetrade.co.za' },
+  { title: 'MrPDF', category: 'Apps', type: 'Document platform · Website · App', image: mrpdfHero, url: 'https://mrpdf.co.za' },
+  { title: 'CareerGate', category: 'Websites', type: 'Career platform · Website · Digital experience', image: careergateHero, url: 'https://careergate.co.za' },
   { title: 'Pitchly AI', category: 'AI & Automation', type: 'AI product · Website · Systems', image: workspace },
   { title: 'EMPIRIAL', category: 'Branding', type: 'Brand identity · Digital studio', image: brandBoard },
-  { title: 'Zion', category: 'Websites', type: 'Trading platform · Product design', image: robotPortraits },
-  { title: 'Samtambani', category: 'Websites', type: 'Business website · Digital experience', image: workspace, url: 'https://samtambani.netlify.app' },
-  { title: 'Little Saints', category: 'Websites', type: 'Business website · Brand experience', image: brandBoard, url: 'https://littlesaints.co.za' },
-  { title: 'M Bendla-M Attorneys', category: 'Websites', type: 'Legal website · Professional services', image: portfolioVisual, url: 'https://www.mbendelamtattorneys.co.za' },
-  { title: 'NNA Electricals', category: 'Websites', type: 'Business website · Services', image: workspace, url: 'https://nnaelectricals.co.za' },
-  { title: 'Mphela Industries', category: 'Websites', type: 'Business website · Digital presence', image: humanRobot, url: 'https://mphelaindus.co.za' },
-  { title: 'GoGo Carwash', category: 'Websites', type: 'Service website · Local business', image: portfolioVisual, url: 'https://gogocarwash1.netlify.app' },
-  { title: "Bong's Kitchen", category: 'E-commerce', type: 'Food brand · Website · Menu experience', image: brandBoard, url: 'https://bongskitchen.netlify.app' },
-  { title: 'Empirial Quizines', category: 'Branding', type: 'Food brand · Visual identity · Website', image: aiAutomation, url: 'https://empirialquizines.netlify.app' },
-  { title: 'Empirial Academy', category: 'Websites', type: 'Education platform · Website', image: workspace, url: 'https://empirialacademy.netlify.app' },
-  { title: 'UreSure', category: 'Apps', type: 'Digital product · App concept', image: robotPortraits, url: 'https://uresure.netlify.app' },
-  { title: 'YT Shika Attorneys', category: 'Websites', type: 'Legal website · Professional services', image: portfolioVisual, url: 'https://ytshikaattorneys.netlify.app' },
-  { title: 'Empirial Coffee', category: 'E-commerce', type: 'Coffee brand · Website · E-commerce', image: brandBoard, url: 'https://empirialcoffee.netlify.app' },
-  { title: 'Empirial Estate', category: 'Websites', type: 'Property website · Digital experience', image: humanRobot, url: 'https://empirialestate.netlify.app' },
-  { title: 'Empirial Pastry', category: 'E-commerce', type: 'Food brand · Website · E-commerce', image: workspace, url: 'https://empirialpastry.netlify.app' },
-  { title: 'Empirial Attorneys', category: 'Websites', type: 'Legal website · Professional services', image: portfolioVisual, url: 'https://empirialattorneys.netlify.app' },
-  { title: 'Miss Empirial SA', category: 'Branding', type: 'Personal brand · Campaign website', image: brandBoard, url: 'https://missempirialsa.netlify.app' },
-  { title: 'Siyalele Projects', category: 'Websites', type: 'Business website · Project showcase', image: humanRobot, url: 'https://siyaleleprojects.netlify.app' },
-  { title: 'Pitchly', category: 'AI & Automation', type: 'AI product · Firebase app', image: aiAutomation, url: 'https://pitchly-5e336.web.app' },
+  { title: 'Zion', category: 'Websites', type: 'Trading platform · Product design', image: zionHero, url: 'https://apex-905a6.web.app/' },
+  { title: 'Samtambani', category: 'Websites', type: 'Business website · Digital experience', image: samtambaniHero, url: 'https://samtambani.netlify.app' },
+  { title: 'Little Saints', category: 'Websites', type: 'Business website · Brand experience', image: littleSaintsHero, url: 'https://littlesaints.co.za' },
+  { title: 'M Bendla-M Attorneys', category: 'Websites', type: 'Legal website · Professional services', image: mBendlaMAttorneysHero, url: 'https://www.mbendelamtattorneys.co.za' },
+  { title: 'NNA Electricals', category: 'Websites', type: 'Business website · Services', image: nnaElectricalsHero, url: 'https://nnaelectrical.co.za/' },
+  { title: 'Mphela Industries', category: 'Websites', type: 'Business website · Digital presence', image: mphelaIndustriesHero, url: 'https://mphelaindus.web.app/' },
+  { title: 'GoGo Carwash', category: 'Websites', type: 'Service website · Local business', image: gogoCarwashHero, url: 'https://gogocarwash1.netlify.app' },
+  { title: "Bong's Kitchen", category: 'E-commerce', type: 'Food brand · Website · Menu experience', image: bongsKitchenHero, url: 'https://bongskitchen.netlify.app' },
+  { title: 'Empirial Quizines', category: 'Branding', type: 'Food brand · Visual identity · Website', image: empirialQuizinesHero, url: 'https://empirialquizines.netlify.app' },
+  { title: 'Empirial Academy', category: 'Websites', type: 'Education platform · Website', image: empirialAcademyHero, url: 'https://empirialacademy.netlify.app' },
+  { title: 'UreSure', category: 'Apps', type: 'Digital product · App concept', image: uresureHero, url: 'https://uresure.netlify.app' },
+  { title: 'YT Shika Attorneys', category: 'Websites', type: 'Legal website · Professional services', image: ytShikaAttorneysHero, url: 'https://ytshikaattonerys.netlify.app/' },
+  { title: 'Empirial Coffee', category: 'E-commerce', type: 'Coffee brand · Website · E-commerce', image: empirialCoffeeHero, url: 'https://empirialcoffee.netlify.app' },
+  { title: 'Empirial Estate', category: 'Websites', type: 'Property website · Digital experience', image: empirialEstateHero, url: 'https://empirialestate.netlify.app' },
+  { title: 'Empirial Pastry', category: 'E-commerce', type: 'Food brand · Website · E-commerce', image: empirialPastryHero, url: 'https://empirialpastry.netlify.app' },
+  { title: 'Empirial Attorneys', category: 'Websites', type: 'Legal website · Professional services', image: empirialAttorneysHero, url: 'https://empirialattorney.netlify.app/' },
+  { title: 'Miss Empirial SA', category: 'Branding', type: 'Personal brand · Campaign website', image: missEmpirialSaHero, url: 'https://missempirialsa.netlify.app' },
+  { title: 'Siyalele Projects', category: 'Websites', type: 'Business website · Project showcase', image: siyaleleProjectsHero, url: 'https://siyaleleprojects.netlify.app' },
+  { title: 'Pitchly', category: 'AI & Automation', type: 'AI product · Firebase app', image: pitchlyHero, url: 'https://pitchly-5e336.web.app' },
 ];
-export const PortfolioPage = () => { const [filter, setFilter] = useState('All'); const filters = ['All', 'Websites', 'Apps', 'AI & Automation', 'Branding', 'E-commerce']; const visibleProjects = filter === 'All' ? projects : projects.filter((project) => project.category === filter); return <Page><section className="px-6 pb-10 pt-36 text-center"><div className="mx-auto max-w-2xl"><h1 className="text-5xl font-semibold tracking-tight sm:text-7xl">Portfolio</h1><p className="mt-5 text-lg leading-8 text-white/55">Explore work built by <span className={purple}>EMPIRIAL</span> across industries.</p></div><div className="mx-auto mt-8 flex max-w-fit flex-wrap justify-center gap-1.5 rounded-full border border-white/10 bg-white/[.025] p-1.5" aria-label="Filter portfolio projects">{filters.map((item) => <button key={item} onClick={() => setFilter(item)} className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${filter === item ? 'bg-[#8138ff] text-white shadow-[0_0_20px_rgba(129,56,255,.25)]' : 'text-white/50 hover:bg-white/10 hover:text-white'}`}>{item}</button>)}</div></section><section className="pb-24 pt-8"><PortfolioCoverflow projects={visibleProjects} /></section><section className="mx-auto max-w-7xl px-6 pb-24"><div className="rounded-2xl border border-dashed border-white/15 p-8 text-center"><Sparkles className="mx-auto mb-4 text-[#b56cff]" /><p className="text-sm text-white/50">More work is coming as the EMPIRIAL family grows.</p><p className="mt-2 text-xl font-semibold">Your project could be next.</p></div></section></Page>; };
+export const PortfolioPage = () => { const [filter, setFilter] = useState('All'); const filters = ['All', 'Websites', 'Apps', 'AI & Automation', 'Branding', 'E-commerce']; const visibleProjects = filter === 'All' ? projects : projects.filter((project) => project.category === filter); return <Page><section className="px-6 pb-10 pt-36 text-center"><div className="mx-auto max-w-2xl"><h1 className="text-5xl font-semibold tracking-tight sm:text-7xl">Portfolio</h1><p className="mt-5 text-lg leading-8 text-white/55">Explore work built by <span className={purple}>EMPIRIAL</span> across industries.</p></div><div className="mx-auto mt-8 flex max-w-fit flex-wrap justify-center gap-1.5 rounded-full border border-white/10 bg-white/[.025] p-1.5" aria-label="Filter portfolio projects">{filters.map((item) => <button key={item} onClick={() => setFilter(item)} className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${filter === item ? 'bg-[#8138ff] text-white shadow-[0_0_20px_rgba(129,56,255,.25)]' : 'text-white/50 hover:bg-white/10 hover:text-white'}`}>{item}</button>)}</div></section><section className="pb-24 pt-8"><PortfolioCoverflow projects={visibleProjects} /></section></Page>; };
 
 export const AboutPage = () => <Page><section className="px-6 pb-24 pt-36"><div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.1fr_.9fr]"><div><Eyebrow>About EMPIRIAL</Eyebrow><h1 className="text-5xl font-semibold tracking-tight sm:text-7xl">Building intelligent digital <span className={purple}>businesses.</span></h1><p className="mt-7 max-w-xl text-lg leading-8 text-white/55">EMPIRIAL exists to help ambitious people turn good ideas into clear, credible, useful digital experiences.</p></div><img src={humanRobot} alt="Human and EMPIRIAL robot collaborating" className="aspect-[4/3] w-full max-w-xl rounded-2xl object-cover" /></div></section><section className="mx-auto grid max-w-7xl gap-12 border-t border-white/10 px-6 py-24 lg:grid-cols-2"><div><Eyebrow>Your story, made digital</Eyebrow><h2 className="text-4xl font-semibold">The best work sits where <span className={purple}>human thinking</span> meets useful technology.</h2></div><div className="space-y-5 text-white/55"><p className="leading-8">We started EMPIRIAL because too many businesses are forced to choose between beautiful design and technology that works. We believe the best digital products need both.</p><p className="leading-8">Our job is to bring clarity to complex ideas, create experiences people trust, and build systems that help your business keep moving after launch.</p></div></section><section className="mx-auto max-w-7xl px-6 pb-24"><img src={workspace} alt="EMPIRIAL futuristic workspace" className="mb-8 h-72 w-full rounded-2xl object-cover opacity-80" /><div className="grid gap-4 md:grid-cols-4">{[['01','Ideas into reality.'],['02','Human + AI connection.'],['03','Signal of intelligence.'],['04','Forward momentum.']].map(([n,t]) => <div key={n} className="rounded-2xl border border-white/10 p-6"><p className="text-sm text-[#b56cff]">{n}</p><p className="mt-14 text-lg font-semibold">{t}</p></div>)}</div></section></Page>;
 
