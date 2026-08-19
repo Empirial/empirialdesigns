@@ -64,6 +64,8 @@ function describeAuthError(error: unknown): string {
         return "Enter a valid email address.";
       case "auth/too-many-requests":
         return "Too many attempts — wait a moment and try again.";
+      case "auth/network-request-failed":
+        return "Network error — check your internet connection and try again.";
       default:
         return error.message;
     }

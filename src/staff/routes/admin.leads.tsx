@@ -58,8 +58,9 @@ import {
 } from "@staff/components/ui/dialog";
 import { useAgents } from "@staff/lib/agents-data";
 import { useServices } from "@staff/lib/services-data";
-import { createLead, invalidateLeadQueries, updateOwnLeadStatus, useLeads } from "@staff/lib/leads";
-import { callBulkAssignLeads, callBulkDeleteLeads, callBulkSetLeadStatus } from "@staff/lib/functions";
+import { createLead, invalidateLeadQueries, useLeads } from "@staff/lib/leads";
+import { leadCountsByAgent } from "@staff/components/agents-admin/agent-stats";
+import { callBulkAssignLeads, callBulkDeleteLeads, callBulkSetLeadStatus, callLogCall } from "@staff/lib/functions";
 import { firebaseAuth } from "@staff/lib/auth";
 import { db } from "@staff/lib/firebase";
 import { LEAD_STATUSES, type Lead, type LeadStatus } from "@staff/lib/types";
@@ -87,6 +88,15 @@ function PageAdminLeads() {
 
   const agentOf = (id: string | null) => agents.find((a) => a.id === id) ?? null;
   const serviceOf = (id: string | null) => services.find((s) => s.id === id) ?? null;
+  // Existing lead load per agent, shown next to their name in every
+  // assign/reassign picker so admins can see who's free before allocating —
+  // otherwise the Assign dropdown is just a blind list of names.
+  const agentLeadCounts = useMemo(() => leadCountsByAgent(leads), [leads]);
+  const agentPickerLabel = (id: string) => {
+    const counts = agentLeadCounts.get(id);
+    if (!counts) return "0 leads";
+    return `${counts.total} lead${counts.total === 1 ? "" : "s"} · ${counts.remainingToCall} left to call`;
+  };
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>(ALL);
@@ -294,11 +304,23 @@ function PageAdminLeads() {
   // flip is for admin cleanup/override use (e.g. a deal closed offline),
   // and intentionally does not create a deal or commission of its own.
   const handleMarkClosedClient = async (lead: Lead) => {
+    const service = serviceOf(lead.serviceId);
+    if (!service) {
+      toast.error("Choose the delivered service before closing this project.");
+      setEditLead(lead);
+      return;
+    }
     setClosingId(lead.id);
     try {
-      await updateOwnLeadStatus(lead.id, "Closed Won");
+      await callLogCall({
+        leadId: lead.id,
+        status: "Closed Won",
+        serviceId: service.id,
+        dealServiceId: service.id,
+        dealValue: service.promoPrice || service.price,
+      });
       invalidateLeadQueries(queryClient, lead.id);
-      toast.success(`${lead.business} marked as closed`);
+      toast.success(`${lead.business} closed — commission has been recorded for the assigned agent.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't close that lead — try again.");
     } finally {
@@ -426,7 +448,9 @@ function PageAdminLeads() {
               </SelectTrigger>
               <SelectContent>
                 {agents.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name} — {agentPickerLabel(a.id)}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -435,7 +459,7 @@ function PageAdminLeads() {
                 <SelectValue placeholder={bulkStatusPending ? "Updating…" : "Change status…"} />
               </SelectTrigger>
               <SelectContent>
-                {LEAD_STATUSES.map((s) => (
+                {LEAD_STATUSES.filter((s) => s !== "Closed Won").map((s) => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
@@ -532,10 +556,8 @@ function PageAdminLeads() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link to="/agent/leads/$id" params={{ id: lead.id }}>
-                                  <Eye className="mr-2 size-4" /> View lead
-                                </Link>
+                              <DropdownMenuItem onClick={() => setEditLead(lead)}>
+                                <Eye className="mr-2 size-4" /> View / edit details
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setEditLead(lead)}>
                                 <Pencil className="mr-2 size-4" /> Edit
@@ -548,7 +570,7 @@ function PageAdminLeads() {
                               >
                                 <UserPlus className="mr-2 size-4" /> Assign
                               </DropdownMenuItem>
-                              {lead.status !== "Closed Won" && lead.status !== "Closed Lost" ? (
+                              {lead.status === "Project in Progress" ? (
                                 <DropdownMenuItem
                                   disabled={closingId === lead.id}
                                   onClick={() => handleMarkClosedClient(lead)}
@@ -588,7 +610,7 @@ function PageAdminLeads() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Quick allocate unassigned leads</DialogTitle><DialogDescription>Assign the next matching unassigned leads without selecting rows one by one. Use the filters above first if you want a specific group.</DialogDescription></DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-1.5"><label className="text-sm font-medium">Agent</label><Select value={quickAssignAgentId} onValueChange={setQuickAssignAgentId}><SelectTrigger><SelectValue placeholder="Choose agent" /></SelectTrigger><SelectContent>{agents.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">Agent</label><Select value={quickAssignAgentId} onValueChange={setQuickAssignAgentId}><SelectTrigger><SelectValue placeholder="Choose agent" /></SelectTrigger><SelectContent>{agents.map((item) => <SelectItem key={item.id} value={item.id}>{item.name} — {agentPickerLabel(item.id)}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1.5"><label className="text-sm font-medium">Number of leads</label><Input type="number" min="1" value={quickAssignCount} onChange={(event) => setQuickAssignCount(event.target.value)} /><p className="text-xs text-muted-foreground">{filtered.filter((lead) => lead.assignedAgentId === null).length} unassigned leads match the current filters.</p></div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setQuickAssignOpen(false)} disabled={bulkAssignPending}>Cancel</Button><Button onClick={() => void handleQuickAssign()} disabled={bulkAssignPending}>{bulkAssignPending ? "Assigning…" : "Allocate leads"}</Button></DialogFooter>
@@ -620,7 +642,9 @@ function PageAdminLeads() {
             <SelectTrigger><SelectValue placeholder="Select agent" /></SelectTrigger>
             <SelectContent>
               {agents.map((a) => (
-                <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name} — {agentPickerLabel(a.id)}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
