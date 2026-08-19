@@ -10,20 +10,18 @@ export type CoverflowProject = {
   url?: string;
 };
 
-const CARD_W = 320;
-const CARD_H = 400;
-const GAP = 24;
-const STEP = CARD_W + GAP;
-
 // Coverflow-style horizontal gallery: the card nearest the viewport centre
 // sits at full size/opacity, neighbours shrink and fade the further they
 // are from centre. Pure CSS scroll-snap + a scroll-linked transform pass —
 // no animation library, no WebGL. Style is set directly on the card refs
 // (not via React state) so it updates every scroll frame without a
-// re-render per tick.
+// re-render per tick. Card width is fluid (see .coverflow-card in the
+// style block below) rather than a fixed px constant, so "step" and
+// "active card" are measured off the actual rendered card each time.
 export default function PortfolioCoverflow({ projects }: { projects: CoverflowProject[] }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -32,22 +30,33 @@ export default function PortfolioCoverflow({ projects }: { projects: CoverflowPr
     const applyTransforms = () => {
       const trackRect = track.getBoundingClientRect();
       const viewportCenter = trackRect.left + trackRect.width / 2;
-      cardRefs.current.forEach((card) => {
+      const step = (cardRefs.current[0]?.getBoundingClientRect().width ?? 0) + GAP_PX;
+      let nearestIndex = 0;
+      let nearestDistance = Infinity;
+
+      cardRefs.current.forEach((card, i) => {
         if (!card) return;
         const cardRect = card.getBoundingClientRect();
         const cardCenter = cardRect.left + cardRect.width / 2;
         const distance = Math.abs(cardCenter - viewportCenter);
-        const normalized = Math.min(distance / STEP, 1.6);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = i;
+        }
+        const normalized = step > 0 ? Math.min(distance / step, 1.6) : 0;
         const scale = 1 - normalized * 0.16;
         const opacity = 1 - normalized * 0.55;
         card.style.transform = `scale(${scale})`;
         card.style.opacity = String(Math.max(0.35, opacity));
       });
+
+      setActiveIndex((prev) => (prev === nearestIndex ? prev : nearestIndex));
     };
 
     // Side padding so the first/last card can each reach dead centre.
     const applyPadding = () => {
-      const pad = Math.max(16, (track.clientWidth - CARD_W) / 2);
+      const cardWidth = cardRefs.current[0]?.getBoundingClientRect().width ?? 0;
+      const pad = Math.max(16, (track.clientWidth - cardWidth) / 2);
       track.style.paddingLeft = `${pad}px`;
       track.style.paddingRight = `${pad}px`;
     };
@@ -76,15 +85,25 @@ export default function PortfolioCoverflow({ projects }: { projects: CoverflowPr
   }, [projects]);
 
   const scrollByStep = (dir: 1 | -1) => {
-    trackRef.current?.scrollBy({ left: dir * STEP, behavior: 'smooth' });
+    const step = (cardRefs.current[0]?.getBoundingClientRect().width ?? 0) + GAP_PX;
+    trackRef.current?.scrollBy({ left: dir * step, behavior: 'smooth' });
+  };
+
+  const scrollToIndex = (index: number) => {
+    const card = cardRefs.current[index];
+    if (!card || !trackRef.current) return;
+    const trackRect = trackRef.current.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    const delta = (cardRect.left + cardRect.width / 2) - (trackRect.left + trackRect.width / 2);
+    trackRef.current.scrollBy({ left: delta, behavior: 'smooth' });
   };
 
   return (
     <div className="relative">
       <div
         ref={trackRef}
-        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ gap: GAP }}
+        className="coverflow-track flex snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ gap: GAP_PX }}
       >
         {projects.map((project, i) => (
           <CoverflowCard
@@ -111,9 +130,35 @@ export default function PortfolioCoverflow({ projects }: { projects: CoverflowPr
       >
         <ChevronRight className="h-5 w-5" />
       </button>
+
+      {projects.length > 1 && (
+        <div className="mt-6 flex items-center justify-center gap-2" role="tablist" aria-label="Portfolio pagination">
+          {projects.map((project, i) => (
+            <button
+              key={project.title}
+              type="button"
+              role="tab"
+              aria-selected={i === activeIndex}
+              aria-label={`Show ${project.title}`}
+              onClick={() => scrollToIndex(i)}
+              className={`h-1.5 rounded-full transition-all duration-300 ${i === activeIndex ? 'w-6 bg-[#a855f7]' : 'w-1.5 bg-white/20 hover:bg-white/35'}`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Fluid card width: roomy and cinematic on desktop, still nearly
+          full-bleed on mobile — replaces the old fixed 320px card so the
+          gallery reads as one long sliding strip rather than a stack of
+          small tiles. */}
+      <style>{`
+        .coverflow-card { width: clamp(280px, 72vw, 860px); height: clamp(240px, 30vw, 360px); }
+      `}</style>
     </div>
   );
 }
+
+const GAP_PX = 20;
 
 const CoverflowCard = ({ project, innerRef }: { project: CoverflowProject; innerRef: (el: HTMLDivElement | null) => void }) => {
   // Cast: which of the two tags (`a`/`div`) we're rendering is only known
@@ -131,8 +176,7 @@ const CoverflowCard = ({ project, innerRef }: { project: CoverflowProject; inner
   return (
     <div
       ref={innerRef}
-      className="group relative shrink-0 snap-center overflow-hidden rounded-[28px] border border-white/10 bg-white/[.03] shadow-[0_20px_60px_rgba(0,0,0,.4)] transition-transform duration-300 ease-out"
-      style={{ width: CARD_W, height: CARD_H }}
+      className="coverflow-card group relative shrink-0 snap-center overflow-hidden rounded-[28px] border border-white/10 bg-white/[.03] shadow-[0_20px_60px_rgba(0,0,0,.4)] transition-transform duration-300 ease-out"
     >
       <Wrapper {...wrapperProps} className="absolute inset-0 block">
         <img src={project.image} alt={`${project.title} project`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
@@ -146,12 +190,12 @@ const CoverflowCard = ({ project, innerRef }: { project: CoverflowProject; inner
           </span>
         )}
 
-        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5">
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5 sm:p-7">
           <div className="min-w-0">
-            <h3 className="truncate text-lg font-semibold text-white">{project.title}</h3>
-            <p className="mt-1 line-clamp-2 text-xs leading-snug text-white/55">{description}</p>
+            <h3 className="truncate text-xl font-semibold text-white sm:text-2xl">{project.title}</h3>
+            <p className="mt-1.5 line-clamp-2 max-w-md text-sm leading-snug text-white/55">{description}</p>
           </div>
-          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border transition ${project.url ? 'border-white/25 bg-white/10 text-white group-hover:border-white/40 group-hover:bg-white/20' : 'border-white/10 bg-white/5 text-white/30'}`}>
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border transition ${project.url ? 'border-white/25 bg-white/10 text-white group-hover:border-white/40 group-hover:bg-white/20' : 'border-white/10 bg-white/5 text-white/30'}`}>
             <ArrowUpRight className="h-4 w-4" />
           </span>
         </div>
