@@ -406,7 +406,7 @@ function AgentProfile({ agent }: { agent: Agent }) {
                         <TableCell>{l.nextFollowUp ? formatDateTime(l.nextFollowUp) : "—"}</TableCell>
                         <TableCell>
                           <Button asChild variant="ghost" size="sm">
-                            <Link to="/admin/leads" search={{ leadId: l.id } as never}>
+                            <Link to="/admin/leads" search={{ leadId: l.id }}>
                               View
                             </Link>
                           </Button>

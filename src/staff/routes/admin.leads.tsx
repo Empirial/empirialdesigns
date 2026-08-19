@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
@@ -66,7 +66,17 @@ import { db } from "@staff/lib/firebase";
 import { LEAD_STATUSES, type Lead, type LeadStatus } from "@staff/lib/types";
 import { formatDate, isOverdue } from "@staff/lib/format";
 
+interface AdminLeadsSearch {
+  // Lets other pages (agent profile's Leads tab, the pipeline Kanban) deep-link
+  // straight to one lead's detail dialog instead of dumping the admin on the
+  // unfiltered list — see the leadId effect below.
+  leadId?: string | undefined;
+}
+
 export const Route = createFileRoute("/admin/leads")({
+  validateSearch: (search: Record<string, unknown>): AdminLeadsSearch => ({
+    leadId: typeof search.leadId === "string" ? search.leadId : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Lead Management — Meridian CRM" },
@@ -85,6 +95,8 @@ function PageAdminLeads() {
   const { data: agents = [] } = useAgents();
   const { data: services = [] } = useServices();
   const queryClient = useQueryClient();
+  const { leadId } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
 
   const agentOf = (id: string | null) => agents.find((a) => a.id === id) ?? null;
   const serviceOf = (id: string | null) => services.find((s) => s.id === id) ?? null;
@@ -121,6 +133,17 @@ function PageAdminLeads() {
   const [assignDialogPending, setAssignDialogPending] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
   const [closingId, setClosingId] = useState<string | null>(null);
+
+  // Deep-link support: other pages (agent profile's Leads tab, the pipeline
+  // Kanban) link here with ?leadId=... instead of sending admins into the
+  // agent-only call workspace. Once leads have loaded, pop that lead's detail
+  // dialog open and drop the param so a refresh doesn't reopen it.
+  useEffect(() => {
+    if (!leadId || loading) return;
+    const match = leads.find((l) => l.id === leadId);
+    if (match) setEditLead(match);
+    navigate({ search: (prev) => ({ ...prev, leadId: undefined }), replace: true });
+  }, [leadId, leads, loading, navigate]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

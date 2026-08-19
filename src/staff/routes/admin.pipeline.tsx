@@ -179,7 +179,7 @@ function PipelineCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <Link to="/agent/leads/$id" params={{ id: lead.id }}>
+              <Link to="/admin/leads" search={{ leadId: lead.id }}>
                 <Eye className="mr-2 size-4" /> Open lead
               </Link>
             </DropdownMenuItem>
