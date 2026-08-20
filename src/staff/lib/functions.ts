@@ -126,9 +126,33 @@ export interface TeamMember {
   targetDeals: number;
   callsToday: number;
   callsThisWeek: number;
+  totalLeads: number;
+  callsLeft: number;
+  interested: number;
+  followUps: number;
+  closedDeals: number;
 }
 
-export const callGetMyTeam = httpsCallable<void, { team: TeamMember[] }>(firebaseFunctions, "getMyTeam");
+export interface TeamLeadContact {
+  id: string;
+  agentId: string;
+  agentName: string;
+  business: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  status: string;
+  nextFollowUp: string | null;
+  lastContact: string | null;
+}
+
+export interface TeamDashboard {
+  team: TeamMember[];
+  interestedLeads: TeamLeadContact[];
+  followUpLeads: TeamLeadContact[];
+}
+
+export const callGetMyTeam = httpsCallable<void, TeamDashboard>(firebaseFunctions, "getMyTeam");
 
 export const callSetAgentTeamLead = httpsCallable<
   { agentId: string; teamLeadId: string | null },

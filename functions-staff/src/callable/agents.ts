@@ -147,13 +147,20 @@ export const getMyTeam = onCall(async (request) => {
   // Fetch each member's lightweight call records in parallel. This preserves
   // per-team access boundaries and avoids exposing the callLogs collection to
   // the client, while keeping the page's call counts based on real call logs.
-  const memberCalls = await Promise.all(
+  const memberActivity = await Promise.all(
     members.docs.map(async (member) => ({
       id: member.id,
-      calls: await db.collection("callLogs").where("agentUid", "==", member.id).get(),
+      ...await (async () => {
+        const [calls, leads, deals] = await Promise.all([
+          db.collection("callLogs").where("agentUid", "==", member.id).get(),
+          db.collection("leads").where("assignedAgentUid", "==", member.id).get(),
+          db.collection("deals").where("agentUid", "==", member.id).get(),
+        ]);
+        return { calls, leads, deals };
+      })(),
     })),
   );
-  const callCounts = new Map(memberCalls.map(({ id, calls }) => {
+  const callCounts = new Map(memberActivity.map(({ id, calls }) => {
     let today = 0;
     let week = 0;
     for (const call of calls.docs) {
@@ -164,6 +171,29 @@ export const getMyTeam = onCall(async (request) => {
     }
     return [id, { today, week }];
   }));
+  const leadStats = new Map(memberActivity.map(({ id, leads, deals }) => {
+    const rows = leads.docs.map((lead) => ({ id: lead.id, ...(lead.data() as { status?: string }) }));
+    return [id, {
+      total: rows.length,
+      callsLeft: rows.filter((lead) => ["New", "Assigned", "Not Called"].includes(lead.status ?? "")).length,
+      interested: rows.filter((lead) => lead.status === "Interested").length,
+      followUps: rows.filter((lead) => lead.status === "Follow-up").length,
+      closedDeals: deals.size,
+    }];
+  }));
+  const memberNameById = new Map(members.docs.map((member) => [member.id, member.data().name ?? "Agent"]));
+  const teamLeads = memberActivity.flatMap(({ id, leads }) => leads.docs.map((lead) => ({
+    id: lead.id,
+    agentId: id,
+    agentName: memberNameById.get(id) ?? "Agent",
+    business: lead.data().business ?? "",
+    contactPerson: lead.data().contactPerson ?? "",
+    phone: lead.data().phone ?? "",
+    email: lead.data().email ?? "",
+    status: lead.data().status ?? "New",
+    nextFollowUp: lead.data().nextFollowUp?.toDate?.().toISOString?.() ?? null,
+    lastContact: lead.data().lastContact?.toDate?.().toISOString?.() ?? null,
+  })));
   return {
     team: members.docs.map((member) => {
       const data = member.data();
@@ -180,7 +210,18 @@ export const getMyTeam = onCall(async (request) => {
         targetDeals: data.targetDeals ?? 0,
         callsToday: callCounts.get(member.id)?.today ?? 0,
         callsThisWeek: callCounts.get(member.id)?.week ?? 0,
+        totalLeads: leadStats.get(member.id)?.total ?? 0,
+        callsLeft: leadStats.get(member.id)?.callsLeft ?? 0,
+        interested: leadStats.get(member.id)?.interested ?? 0,
+        followUps: leadStats.get(member.id)?.followUps ?? 0,
+        closedDeals: leadStats.get(member.id)?.closedDeals ?? 0,
       };
     }),
+    interestedLeads: [...teamLeads]
+      .filter((lead) => lead.status === "Interested")
+      .sort((a, b) => String(b.lastContact ?? "").localeCompare(String(a.lastContact ?? ""))),
+    followUpLeads: [...teamLeads]
+      .filter((lead) => lead.status === "Follow-up")
+      .sort((a, b) => String(a.nextFollowUp ?? "").localeCompare(String(b.nextFollowUp ?? ""))),
   };
 });
