@@ -76,7 +76,7 @@ import { computeAgentStats } from "@staff/components/agents-admin/agent-stats";
 import { ReassignLeadsDialog } from "@staff/components/agents-admin/reassign-leads-dialog";
 import type { Agent } from "@staff/lib/types";
 import { cn } from "@staff/lib/utils";
-import { callInviteUser, callPermanentlyDeleteUser, callRemoveUser, callResetUserPassword, callSetAgentJobTitle, callSetAgentTeamLead, callToggleAgentStatus } from "@staff/lib/functions";
+import { callInviteUser, callPermanentlyDeleteUser, callRemoveUser, callResetUserPassword, callSetAgentJobTitle, callSetAgentMonthlyTarget, callSetAgentTeamLead, callToggleAgentStatus } from "@staff/lib/functions";
 
 export const Route = createFileRoute("/admin/agents/")({
   head: () => ({
@@ -119,6 +119,9 @@ function PageAdminAgentsIndex() {
   const [teamTarget, setTeamTarget] = useState<Agent | null>(null);
   const [selectedTeamLeadId, setSelectedTeamLeadId] = useState("none");
   const [assigningTeam, setAssigningTeam] = useState(false);
+  const [targetTarget, setTargetTarget] = useState<Agent | null>(null);
+  const [monthlyTargetInput, setMonthlyTargetInput] = useState(0);
+  const [savingTarget, setSavingTarget] = useState(false);
   const [changingTitleId, setChangingTitleId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
@@ -220,6 +223,12 @@ function PageAdminAgentsIndex() {
     } finally {
       setChangingTitleId(null);
     }
+  }
+
+  async function handleSaveTarget() {
+    if (!targetTarget || monthlyTargetInput < 0) return;
+    setSavingTarget(true);
+    try { await callSetAgentMonthlyTarget({ agentId: targetTarget.id, monthlyTarget: monthlyTargetInput }); await queryClient.invalidateQueries({ queryKey: ["agents"] }); toast.success("Monthly target updated"); setTargetTarget(null); } catch (err) { toast.error(err instanceof Error ? err.message : "Couldn't update the monthly target."); } finally { setSavingTarget(false); }
   }
 
   async function handleResetPassword(agent: Agent) {
@@ -625,6 +634,7 @@ function PageAdminAgentsIndex() {
                           <DropdownMenuItem disabled={changingTitleId === s.agent.id} onClick={() => handleJobTitle(s.agent, s.agent.role === "Team Lead" ? "Sales Agent" : "Team Lead")}>
                             {changingTitleId === s.agent.id ? "Saving…" : s.agent.role === "Team Lead" ? "Demote from Team Lead" : "Promote to Team Lead"}
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setTargetTarget(s.agent); setMonthlyTargetInput(s.agent.monthlyTarget); }}>Set monthly target</DropdownMenuItem>
                           <DropdownMenuItem
                             disabled={resettingId === s.agent.id}
                             onClick={() => handleResetPassword(s.agent)}
@@ -702,6 +712,7 @@ function PageAdminAgentsIndex() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={!!targetTarget} onOpenChange={(open) => !open && setTargetTarget(null)}><DialogContent><DialogHeader><DialogTitle>Set monthly target</DialogTitle><DialogDescription>Set the sales target for {targetTarget?.name}.</DialogDescription></DialogHeader><div className="space-y-1.5"><Label htmlFor="monthly-target">Monthly target (R)</Label><Input id="monthly-target" type="number" min="0" value={monthlyTargetInput} onChange={(event) => setMonthlyTargetInput(Number(event.target.value) || 0)} /></div><DialogFooter><Button variant="outline" onClick={() => setTargetTarget(null)} disabled={savingTarget}>Cancel</Button><Button onClick={handleSaveTarget} disabled={savingTarget}>{savingTarget ? "Saving…" : "Save target"}</Button></DialogFooter></DialogContent></Dialog>
 
       <AlertDialog open={!!removeTarget} onOpenChange={(o) => !o && setRemoveTarget(null)}>
         <AlertDialogContent>

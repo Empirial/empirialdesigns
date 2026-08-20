@@ -163,6 +163,7 @@ export const callSetAgentJobTitle = httpsCallable<
   { agentId: string; jobTitle: "Sales Agent" | "Senior Agent" | "Team Lead" },
   { agentId: string; jobTitle: "Sales Agent" | "Senior Agent" | "Team Lead" }
 >(firebaseFunctions, "setAgentJobTitle");
+export const callSetAgentMonthlyTarget = httpsCallable<{ agentId: string; monthlyTarget: number }, { agentId: string; monthlyTarget: number }>(firebaseFunctions, "setAgentMonthlyTarget");
 
 export interface SeedDemoDataResult {
   servicesSeeded: number;

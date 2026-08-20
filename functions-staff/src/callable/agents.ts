@@ -131,6 +131,24 @@ export const setAgentJobTitle = onCall<SetAgentJobTitleInput>(async (request) =>
   return { agentId, jobTitle };
 });
 
+interface SetAgentMonthlyTargetInput { agentId: string; monthlyTarget: number; }
+/** Admin-only target setting; targets remain server-managed operational data. */
+export const setAgentMonthlyTarget = onCall<SetAgentMonthlyTargetInput>(async (request) => {
+  const { uid: adminUid } = requireAdmin(request);
+  const { agentId, monthlyTarget } = request.data ?? ({} as SetAgentMonthlyTargetInput);
+  if (!agentId || typeof agentId !== "string" || !Number.isFinite(monthlyTarget) || monthlyTarget < 0) {
+    throw new HttpsError("invalid-argument", "A valid non-negative monthly target is required.");
+  }
+  const ref = db.doc(`agents/${agentId}`);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "Agent not found.");
+  const batch = db.batch();
+  batch.update(ref, { monthlyTarget: Math.round(monthlyTarget) });
+  writeAuditLog(batch, { actorUid: adminUid, action: "agents.setMonthlyTarget", targetCollection: "agents", targetId: agentId, before: { monthlyTarget: snap.data()?.monthlyTarget ?? 0 }, after: { monthlyTarget: Math.round(monthlyTarget) } });
+  await batch.commit();
+  return { agentId, monthlyTarget: Math.round(monthlyTarget) };
+});
+
 /** Returns a Team Lead's roster through the server, rather than granting an
  * agent broad Firestore list access to everyone's profile. */
 export const getMyTeam = onCall(async (request) => {
