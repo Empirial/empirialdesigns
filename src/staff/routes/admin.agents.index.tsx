@@ -76,7 +76,7 @@ import { computeAgentStats } from "@staff/components/agents-admin/agent-stats";
 import { ReassignLeadsDialog } from "@staff/components/agents-admin/reassign-leads-dialog";
 import type { Agent } from "@staff/lib/types";
 import { cn } from "@staff/lib/utils";
-import { callInviteUser, callRemoveUser, callResetUserPassword, callToggleAgentStatus } from "@staff/lib/functions";
+import { callInviteUser, callRemoveUser, callResetUserPassword, callSetAgentTeamLead, callToggleAgentStatus } from "@staff/lib/functions";
 
 export const Route = createFileRoute("/admin/agents/")({
   head: () => ({
@@ -113,6 +113,9 @@ function PageAdminAgentsIndex() {
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [reassignTarget, setReassignTarget] = useState<Agent | null>(null);
+  const [teamTarget, setTeamTarget] = useState<Agent | null>(null);
+  const [selectedTeamLeadId, setSelectedTeamLeadId] = useState("none");
+  const [assigningTeam, setAssigningTeam] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -121,7 +124,13 @@ function PageAdminAgentsIndex() {
     role: "Sales Agent" as Agent["role"],
     monthlyTarget: 30000,
     commissionRate: 10,
+    teamLeadId: "none",
   });
+
+  const teamLeads = useMemo(
+    () => agents.filter((agent) => agent.role === "Team Lead" && agent.status === "Active"),
+    [agents],
+  );
 
   const stats = useMemo(
     () => agents.map((a) => computeAgentStats(a, leads, deals, callLogs)),
@@ -169,14 +178,30 @@ function PageAdminAgentsIndex() {
         jobTitle: form.role,
         monthlyTarget: form.monthlyTarget,
         commissionRateOverride: form.commissionRate,
+        teamLeadId: form.role === "Team Lead" || form.teamLeadId === "none" ? undefined : form.teamLeadId,
       });
       setAddOpen(false);
-      setForm({ name: "", email: "", phone: "", role: "Sales Agent", monthlyTarget: 30000, commissionRate: 10 });
+      setForm({ name: "", email: "", phone: "", role: "Sales Agent", monthlyTarget: 30000, commissionRate: 10, teamLeadId: "none" });
       setTempPasswordResult({ email: result.data.email, tempPassword: result.data.tempPassword, mode: "created" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't add that agent — try again.");
     } finally {
       setAdding(false);
+    }
+  }
+
+  async function handleAssignTeamLead() {
+    if (!teamTarget) return;
+    setAssigningTeam(true);
+    try {
+      await callSetAgentTeamLead({ agentId: teamTarget.id, teamLeadId: selectedTeamLeadId === "none" ? null : selectedTeamLeadId });
+      await queryClient.invalidateQueries({ queryKey: ["agents"] });
+      toast.success(selectedTeamLeadId === "none" ? "Team assignment removed" : "Team Lead assigned");
+      setTeamTarget(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save the team assignment — try again.");
+    } finally {
+      setAssigningTeam(false);
     }
   }
 
@@ -297,6 +322,18 @@ function PageAdminAgentsIndex() {
                     />
                   </div>
                 </div>
+                {form.role !== "Team Lead" ? (
+                  <div className="space-y-1.5">
+                    <Label>Team Lead</Label>
+                    <Select value={form.teamLeadId} onValueChange={(v) => setForm((f) => ({ ...f, teamLeadId: v }))}>
+                      <SelectTrigger><SelectValue placeholder="No team assigned" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No team assigned</SelectItem>
+                        {teamLeads.map((lead) => <SelectItem key={lead.id} value={lead.id}>{lead.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label>Role</Label>
@@ -467,6 +504,7 @@ function PageAdminAgentsIndex() {
                 resetting={resettingId === s.agent.id}
                 onToggleStatus={() => toggleStatus(s.agent)}
                 onReassign={() => setReassignTarget(s.agent)}
+                onAssignTeam={() => { setTeamTarget(s.agent); setSelectedTeamLeadId(s.agent.teamLeadId ?? "none"); }}
                 onResetPassword={() => handleResetPassword(s.agent)}
                 onDeactivate={() => setDeactivateTarget(s.agent)}
                 onRemove={() => setRemoveTarget(s.agent)}
@@ -544,6 +582,9 @@ function PageAdminAgentsIndex() {
                           <DropdownMenuItem onClick={() => setReassignTarget(s.agent)}>
                             Reassign leads
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setTeamTarget(s.agent); setSelectedTeamLeadId(s.agent.teamLeadId ?? "none"); }}>
+                            Assign Team Lead
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             disabled={resettingId === s.agent.id}
                             onClick={() => handleResetPassword(s.agent)}
@@ -596,6 +637,29 @@ function PageAdminAgentsIndex() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog open={!!teamTarget} onOpenChange={(open) => !open && setTeamTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Team Lead</DialogTitle>
+            <DialogDescription>Choose the Team Lead responsible for {teamTarget?.name}, or leave them unassigned.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Team Lead</Label>
+            <Select value={selectedTeamLeadId} onValueChange={setSelectedTeamLeadId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No team assigned</SelectItem>
+                {teamLeads.filter((lead) => lead.id !== teamTarget?.id).map((lead) => <SelectItem key={lead.id} value={lead.id}>{lead.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTeamTarget(null)} disabled={assigningTeam}>Cancel</Button>
+            <Button onClick={handleAssignTeamLead} disabled={assigningTeam}>{assigningTeam ? "Saving…" : "Save assignment"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={!!removeTarget} onOpenChange={(o) => !o && setRemoveTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -636,6 +700,7 @@ function AgentCard({
   resetting,
   onToggleStatus,
   onReassign,
+  onAssignTeam,
   onResetPassword,
   onDeactivate,
   onRemove,
@@ -645,6 +710,7 @@ function AgentCard({
   resetting?: boolean;
   onToggleStatus: () => void;
   onReassign: () => void;
+  onAssignTeam: () => void;
   onResetPassword: () => void;
   onDeactivate: () => void;
   onRemove: () => void;
@@ -664,6 +730,7 @@ function AgentCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={onReassign}>Reassign leads</DropdownMenuItem>
+            <DropdownMenuItem onClick={onAssignTeam}>Assign Team Lead</DropdownMenuItem>
             <DropdownMenuItem disabled={resetting} onClick={onResetPassword}>
               {resetting ? "Resetting…" : "Reset password"}
             </DropdownMenuItem>

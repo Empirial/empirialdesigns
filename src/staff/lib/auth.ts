@@ -1,11 +1,14 @@
 import {
   createUserWithEmailAndPassword,
+  EmailAuthProvider,
   getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  reauthenticateWithCredential,
+  updatePassword,
   type User,
 } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
@@ -204,6 +207,21 @@ export async function signOutUser(): Promise<void> {
   clearStaffSession();
   clearMockStaffSession();
   await signOut(firebaseAuth);
+}
+
+/**
+ * Lets a signed-in staff member change their own password. Firebase requires
+ * a recent sign-in for this sensitive operation, so we verify the current
+ * password immediately before saving the new one.
+ */
+export async function changeOwnPassword(currentPassword: string, newPassword: string): Promise<void> {
+  const user = firebaseAuth.currentUser;
+  if (!user?.email) {
+    throw new Error("Password changes are only available for email-and-password accounts.");
+  }
+  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, credential);
+  await updatePassword(user, newPassword);
 }
 
 /**

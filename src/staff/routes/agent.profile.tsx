@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Landmark, User } from "lucide-react";
+import { KeyRound, Landmark, User } from "lucide-react";
 import { AppShell } from "@staff/components/layout/app-shell";
 import { PageHeader } from "@staff/components/shared/page-header";
 import { SectionCard } from "@staff/components/shared/section-card";
@@ -10,7 +10,7 @@ import { Button } from "@staff/components/ui/button";
 import { Input } from "@staff/components/ui/input";
 import { Label } from "@staff/components/ui/label";
 import { useAgentDoc, updateOwnBankingDetails } from "@staff/lib/agents-data";
-import { firebaseAuth, getMockStaffProfile } from "@staff/lib/auth";
+import { changeOwnPassword, firebaseAuth, getMockStaffProfile } from "@staff/lib/auth";
 
 export const Route = createFileRoute("/agent/profile")({
   head: () => ({
@@ -34,6 +34,10 @@ function PageAgentProfile() {
   const [accountNumber, setAccountNumber] = useState("");
   const [branchCode, setBranchCode] = useState("");
   const [saving, setSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // Seed the form once the agent doc loads — a plain useEffect, not
   // per-keystroke sync, so typing isn't fought by refetches.
@@ -58,6 +62,33 @@ function PageAgentProfile() {
       toast.error(err instanceof Error ? err.message : "Couldn't save your banking details — try again.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleChangePassword() {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error("Complete all password fields");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("Your new password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Your new passwords don't match");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await changeOwnPassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("Password changed successfully");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't change your password — please try again.");
+    } finally {
+      setChangingPassword(false);
     }
   }
 
@@ -137,6 +168,30 @@ function PageAgentProfile() {
             ) : null}
             <Button onClick={handleSave} disabled={saving || Boolean(mockProfile)}>
               {saving ? "Saving…" : "Save banking details"}
+            </Button>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Change password">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <KeyRound className="size-4" /> Use a new password that only you know
+          </div>
+          <div className="mt-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="current-password">Current password</Label>
+              <Input id="current-password" type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-password">New password</Label>
+              <Input id="new-password" type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-password">Confirm new password</Label>
+              <Input id="confirm-password" type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+            </div>
+            {mockProfile ? <p className="text-xs text-muted-foreground">Password changes are disabled in demo mode.</p> : null}
+            <Button onClick={handleChangePassword} disabled={changingPassword || Boolean(mockProfile)}>
+              {changingPassword ? "Changing…" : "Change password"}
             </Button>
           </div>
         </SectionCard>

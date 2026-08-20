@@ -3,7 +3,7 @@ export { onUserCreate } from "./triggers/onUserCreate";
 export { logCall } from "./callable/logCall";
 export { bulkAssignLeads, bulkDeleteLeads, bulkSetLeadStatus } from "./callable/leads";
 export { setDealPayment } from "./callable/deals";
-export { toggleAgentStatus } from "./callable/agents";
+export { getMyTeam, setAgentTeamLead, toggleAgentStatus } from "./callable/agents";
 export { inviteUser, changeUserRole, removeUser, resetUserPassword } from "./callable/users";
 export { seedDemoData } from "./callable/seed";
 export { getTeamLeaderboard } from "./callable/leaderboard";

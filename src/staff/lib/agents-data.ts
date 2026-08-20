@@ -23,6 +23,7 @@ function mapAgentDoc(id: string, data: DocumentData): Agent {
     callsToday: data.callsToday ?? 0,
     callsThisWeek: data.callsThisWeek ?? [0, 0, 0, 0, 0, 0, 0],
     online: data.online ?? false,
+    teamLeadId: data.teamLeadId ?? null,
     bankName: data.bankName ?? undefined,
     accountNumber: data.accountNumber ?? undefined,
     branchCode: data.branchCode ?? undefined,

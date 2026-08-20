@@ -2,6 +2,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { db } from "../lib/admin";
 import { requireAuth } from "../lib/authz";
+import { requireAdmin } from "../lib/authz";
 import { writeAuditLog } from "../lib/audit";
 
 interface ToggleAgentStatusInput {
@@ -47,4 +48,74 @@ export const toggleAgentStatus = onCall<ToggleAgentStatusInput>(async (request) 
   });
 
   return { agentId, status: newStatus };
+});
+
+interface SetAgentTeamLeadInput {
+  agentId: string;
+  teamLeadId: string | null;
+}
+
+/** Admin-only team assignment. Team membership is server-managed so agents
+ * cannot add themselves to a lead's roster. */
+export const setAgentTeamLead = onCall<SetAgentTeamLeadInput>(async (request) => {
+  const { uid: adminUid } = requireAdmin(request);
+  const { agentId, teamLeadId } = request.data ?? ({} as SetAgentTeamLeadInput);
+  if (!agentId || typeof agentId !== "string" || (teamLeadId !== null && typeof teamLeadId !== "string")) {
+    throw new HttpsError("invalid-argument", "agentId and teamLeadId are required.");
+  }
+  if (agentId === teamLeadId) {
+    throw new HttpsError("invalid-argument", "An agent cannot lead their own team.");
+  }
+
+  const agentRef = db.doc(`agents/${agentId}`);
+  const agentSnap = await agentRef.get();
+  if (!agentSnap.exists) throw new HttpsError("not-found", "Agent not found.");
+
+  if (teamLeadId) {
+    const teamLead = await db.doc(`agents/${teamLeadId}`).get();
+    if (!teamLead.exists || teamLead.data()?.role !== "Team Lead" || teamLead.data()?.status !== "Active") {
+      throw new HttpsError("failed-precondition", "Select an active Team Lead.");
+    }
+  }
+
+  const batch = db.batch();
+  batch.update(agentRef, { teamLeadId });
+  writeAuditLog(batch, {
+    actorUid: adminUid,
+    action: "agents.setTeamLead",
+    targetCollection: "agents",
+    targetId: agentId,
+    before: { teamLeadId: agentSnap.data()?.teamLeadId ?? null },
+    after: { teamLeadId },
+  });
+  await batch.commit();
+  return { agentId, teamLeadId };
+});
+
+/** Returns a Team Lead's roster through the server, rather than granting an
+ * agent broad Firestore list access to everyone's profile. */
+export const getMyTeam = onCall(async (request) => {
+  const { uid } = requireAuth(request);
+  const lead = await db.doc(`agents/${uid}`).get();
+  if (!lead.exists || lead.data()?.role !== "Team Lead") {
+    throw new HttpsError("permission-denied", "Team Lead access required.");
+  }
+  const members = await db.collection("agents").where("teamLeadId", "==", uid).get();
+  return {
+    team: members.docs.map((member) => {
+      const data = member.data();
+      return {
+        id: member.id,
+        name: data.name ?? "",
+        initials: data.initials ?? "",
+        email: data.email ?? "",
+        phone: data.phone ?? "",
+        role: data.role ?? "Sales Agent",
+        status: data.status ?? "Inactive",
+        online: data.online ?? false,
+        monthlyTarget: data.monthlyTarget ?? 0,
+        targetDeals: data.targetDeals ?? 0,
+      };
+    }),
+  };
 });

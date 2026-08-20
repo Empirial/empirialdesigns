@@ -38,6 +38,8 @@ import { useLeads } from "@staff/lib/leads";
 import { useMyFollowUps } from "@staff/lib/followups-data";
 import { cn } from "@staff/lib/utils";
 import { signOutUser } from "@staff/lib/auth";
+import { firebaseAuth, getMockStaffProfile } from "@staff/lib/auth";
+import { useAgentDoc } from "@staff/lib/agents-data";
 import { Button } from "@staff/components/ui/button";
 import empirialIcon from "@/assets/Brand ID/empirial-icon.png";
 
@@ -79,11 +81,16 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const portal = pathname.startsWith("/agent") ? "agent" : "admin";
-  const items = portal === "agent" ? AGENT_NAV : ADMIN_NAV;
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { data: leads = [] } = useLeads({ enabled: portal === "admin" });
   const { data: followUps = [] } = useMyFollowUps({ enabled: portal === "agent" });
+  const ownUid = firebaseAuth.currentUser?.uid ?? (getMockStaffProfile() ? "ag-1" : undefined);
+  const { data: ownAgent } = useAgentDoc(portal === "agent" ? ownUid : undefined);
+  const agentItems = ownAgent?.role === "Team Lead"
+    ? [...AGENT_NAV.slice(0, 1), { title: "My Team", to: "/agent/team", icon: Users }, ...AGENT_NAV.slice(1)]
+    : AGENT_NAV;
+  const items = portal === "agent" ? agentItems : ADMIN_NAV;
 
   const unassigned = leads.filter((l) => !l.assignedAgentId).length;
   const dueFollowUps = followUps.filter((f) => f.status === "Open" && new Date(f.dueAt) <= new Date()).length;

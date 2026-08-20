@@ -38,6 +38,7 @@ interface InviteUserInput {
   monthlyTarget?: number;
   targetDeals?: number;
   commissionRateOverride?: number;
+  teamLeadId?: string;
 }
 
 /**
@@ -59,6 +60,7 @@ export const inviteUser = onCall<InviteUserInput>(async (request) => {
     monthlyTarget,
     targetDeals,
     commissionRateOverride,
+    teamLeadId,
   } = request.data ?? ({} as InviteUserInput);
 
   if (!email || typeof email !== "string") {
@@ -69,6 +71,16 @@ export const inviteUser = onCall<InviteUserInput>(async (request) => {
   }
   if (role !== "admin" && role !== "agent") {
     throw new HttpsError("invalid-argument", "role must be 'admin' or 'agent'.");
+  }
+
+  if (teamLeadId !== undefined) {
+    if (role !== "agent") {
+      throw new HttpsError("invalid-argument", "Only agents can be assigned to a team lead.");
+    }
+    const teamLead = await db.doc(`agents/${teamLeadId}`).get();
+    if (!teamLead.exists || teamLead.data()?.role !== "Team Lead" || teamLead.data()?.status !== "Active") {
+      throw new HttpsError("failed-precondition", "Select an active Team Lead.");
+    }
   }
 
   try {
@@ -132,6 +144,7 @@ export const inviteUser = onCall<InviteUserInput>(async (request) => {
       commissionRateOverride: commissionRateOverride ?? null,
       callsToday: 0,
       callsThisWeek: [0, 0, 0, 0, 0, 0, 0],
+      teamLeadId: teamLeadId ?? null,
     });
   }
 
