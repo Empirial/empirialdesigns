@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, ArrowUpRight } from 'lucide-react';
-import { useLinkPreview } from '@/features/marketing/lib/linkPreview';
 
 export type CoverflowProject = {
   title: string;
@@ -174,18 +173,17 @@ const CoverflowCard = ({ project, layout, innerRef }: { project: CoverflowProjec
   const Wrapper = (project.url ? 'a' : 'div') as any;
   const wrapperProps = project.url ? { href: project.url, target: '_blank', rel: 'noreferrer' } : {};
 
-  // Live SEO metadata pulled off project.url (see functions/index.js's
-  // fetchLinkPreview) — falls back to the curated copy below until it
-  // resolves, or forever if the target site has none / is unreachable.
-  const preview = useLinkPreview(project.url);
-  const [faviconFailed, setFaviconFailed] = useState(false);
-  const [previewImageFailed, setPreviewImageFailed] = useState(false);
-  const description = preview?.description || project.type;
-  // The site's own Open Graph image (its real homepage/social preview) beats
-  // the curated stock art whenever it actually loads — falls back to the
-  // curated image while the preview is still resolving, if the site has no
-  // og:image, or if that image 404s.
-  const cardImage = preview?.image && !previewImageFailed ? preview.image : project.image;
+  // Card image, favicon, and description all used to come from live SEO
+  // metadata (functions/index.js's fetchLinkPreview) pulled off project.url
+  // — dropped entirely, not just for the image. Several of these sites were
+  // built with Lovable and never customized their social-preview meta tag,
+  // so the "live" data was Lovable's own generic branding (its heart-shaped
+  // favicon, "Build apps and websites by chatting with AI" as the og:image
+  // and og:description) rather than anything about the actual site. The
+  // curated screenshot + copy below is always accurate; the live fetch
+  // never reliably was.
+  const description = project.type;
+  const cardImage = project.image;
 
   return (
     <div
@@ -197,17 +195,8 @@ const CoverflowCard = ({ project, layout, innerRef }: { project: CoverflowProjec
           src={cardImage}
           alt={`${project.title} project`}
           className={`h-full w-full transition duration-500 group-hover:scale-105 ${layout === 'poster' ? 'object-contain' : 'object-cover'}`}
-          onError={() => setPreviewImageFailed(true)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-
-        {/* Site favicon, pulled live from the URL's own SEO metadata —
-            sits up front on the card like a link-preview chip. */}
-        {preview?.favicon && !faviconFailed && (
-          <span className="absolute left-4 top-4 grid h-8 w-8 place-items-center rounded-[10px] bg-white/95 shadow-lg ring-1 ring-black/10">
-            <img src={preview.favicon} alt="" className="h-[18px] w-[18px] object-contain" onError={() => setFaviconFailed(true)} />
-          </span>
-        )}
 
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5 sm:p-7">
           <div className="min-w-0">

@@ -1,14 +1,30 @@
 # AI website builder — unified engine plan
 
-Status: phases 1–6 implemented **and deployed**; phase 4/5 frontend wiring
-is also done (see "Phases 4/5/7" below — no longer paused); phase 7
-(cleanup) still open. Companion to [CODE_REVIEW.md](./CODE_REVIEW.md). See
-also [MULTI_AGENT_ORCHESTRATION.md](./MULTI_AGENT_ORCHESTRATION.md), which
-sits upstream of everything in this document — it decides what `<file>`
-blocks get produced; everything below about how those blocks get stored,
-synced, and pushed to GitHub is unchanged by it.
+Status: phases 1–6 implemented **and deployed**, but **the actual sync
+mechanics diverged from this plan** — see "Implementation status" below for
+what's real vs. what was never built (the Firestore-trigger + scheduled-sweep
+half of the sync design in particular). Phase 4/5 frontend wiring is also
+done (see "Phases 4/5/7" below — no longer paused); phase 7 (cleanup) still
+open. Companion to [CODE_REVIEW.md](./CODE_REVIEW.md). See also
+[MULTI_AGENT_ORCHESTRATION.md](./MULTI_AGENT_ORCHESTRATION.md), which sits
+upstream of everything in this document — it decides what `<file>` blocks
+get produced; everything below about how those blocks get stored, synced,
+and pushed to GitHub is unchanged by it. **That document itself is now
+stale** in places (old file paths from before the `functions/agents/`
+reorg, an agent count that predates Request Taker merging into Goal Setter)
+— not corrected here since it's out of this document's scope; flagging so
+it doesn't get read as current.
+
+The pipeline code itself now lives under `functions/agents/`, organized
+into 10 numbered layers (model config, system prompts, tool definitions,
+tool execution, the agent loop, memory/context, guardrails, error handling,
+streaming, evaluation) — see
+[`functions/agents/README.md`](../functions/agents/README.md) for the
+authoritative map of what lives where; this document doesn't repeat that
+layout, only the read/write/sync path around it.
 [engine-diagram.html](./engine-diagram.html) has the visual version of the
-read/write/sync path below.
+read/write/sync path below (not yet updated for the sync-mechanics
+corrections in "Implementation status").
 
 ## Deployment state (new — this used to only exist as source)
 
@@ -24,11 +40,36 @@ Firebase Auth + Cloud Function + Firestore REST calls against the real
   `getAfter()` specifically because `createWebsite` writes the parent repo
   doc and its first file docs in one atomic batch, and a plain `get()` only
   sees pre-batch state).
-- **All 7 Cloud Functions are deployed** (Node 20 — Node 18 was
-  decommissioned; `createWebsite` runs with a 300s timeout / 512MB, since
-  full-site generation plus one GitHub API call per file for the initial
-  commit routinely takes 20-50s+ and would otherwise hit the platform's
-  default 60s HTTP timeout).
+- **35 Cloud Functions are deployed** (Node 20 — Node 18 was decommissioned),
+  not the "7" this doc originally shipped with. `createWebsite` runs with a
+  300s timeout / 1GB, since full-site generation plus one GitHub API call per
+  file for the initial commit routinely takes 20-50s+ and would otherwise hit
+  the platform's default 60s HTTP timeout. The 7 this document actually
+  covers (the builder read/write/sync path) are `createWebsite`, `aiChat`,
+  `getRepoTree`, `getRepoContents`, `requestRepoSync`, `publishWebsite`,
+  `getDeploymentStatus`. The other ~28 are unrelated product surfaces added
+  since — SEO auditing (`seoAudit`, `pageSpeedAudit`), Google integrations
+  (Business Profile, Search Console, Places/reviews, Analytics, OAuth
+  connect/callback), domain connection (`connectDomain`/`getDomainStatus`/
+  `disconnectDomain`), uptime monitoring, image generation, and the sales
+  assistant — none of them touch the generation/sync path this doc describes,
+  so they're out of scope here (see `functions/agents/README.md`'s own note
+  on why they don't get a numbered-layer folder either).
+- **Publishing a generated site is now real, and goes through Vercel, not
+  Netlify** — `publishWebsite` force-syncs any pending Firestore edits to
+  GitHub, then calls Vercel's API (`ensureVercelProject` →
+  `createProductionDeployment` → `pollDeployment`) to build and deploy from
+  that repo, and `getDeploymentStatus` lets the frontend keep polling past
+  its own short wait window. `connectDomain`/`getDomainStatus`/
+  `disconnectDomain` layer custom-domain support on top of the same Vercel
+  project. **`createWebsite`'s `deploy_url` field is a leftover**: it still
+  writes a guessed `https://${repoName}.netlify.app` string at creation time
+  even though nothing ever deploys there — real deployment state lives in
+  `vercel_deployment_status`/`vercel_production_url`, written by
+  `publishWebsite` once a site is actually published. `buildRepoStatusSnapshot`
+  (`06-memory-context/repoStatus.js`) reads the Vercel fields, not
+  `deploy_url` — the stale field is dead weight, not something anything
+  downstream trusts.
 - **The pipeline calls DeepSeek directly**, not OpenRouter — see
   [MULTI_AGENT_ORCHESTRATION.md](./MULTI_AGENT_ORCHESTRATION.md)'s model
   section for why. `DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL` in `functions/.env`.
@@ -65,32 +106,65 @@ Firebase Auth + Cloud Function + Firestore REST calls against the real
 
 ## Implementation status
 
-- ✅ **Phase 1 — Firestore schema.** `functions/index.js`'s `createWebsite` now
-  seeds `user_repos/{id}/files/{path}` (one doc per file) and the sync-status
-  fields (`github_sync_status`, `pending_edit_count`, `last_edit_at`,
-  `last_synced_at`, `last_commit_sha`) in one batch write.
-- ✅ **Phase 2 — sync mechanics.** `syncRepoToGitHub` (reads the current
-  `files` subcollection, commits blob → tree → commit → update ref, with
-  chunked/concurrent blob creation), `onRepoFileWrite` (Firestore trigger,
-  counts edits, flushes at the threshold), `scheduledRepoSync` (5-minute
-  sweep, backstop for anything left `dirty`/`error`), `requestRepoSync`
-  (explicit-flush HTTP endpoint, for a future Save/Publish button). A
-  `tryClaimSync` transaction prevents the trigger, the sweep, and an
-  explicit request from syncing the same repo concurrently. Defaults:
-  **3-edit threshold**, **2-minute idle window** for the sweep — see "Open
-  questions" below, now answered by these defaults unless you want them
-  tuned.
+- ⚠️ **Phase 1 — Firestore schema, only half true today.** The
+  sync-status fields (`github_sync_status`, `pending_edit_count`,
+  `last_synced_at`, `last_commit_sha`) and the `user_repos/{id}/files/{path}`
+  subcollection shape both exist and are what everything downstream reads —
+  but **`createWebsite` does not write to the `files` subcollection at all**.
+  It commits the generated files straight to GitHub (Step 7 in
+  `functions/index.js`) and saves only top-level repo-doc fields (Step 8:
+  `section_manifest`, `style`, `palette`, `repo_url`, etc.) — no per-file
+  Firestore docs. A freshly-created project's Firestore file cache starts
+  **empty**; it only gets populated by the cold-start GitHub-hydration
+  fallback (`hydrateRepoFilesFromGithubIfEmpty`, see "Figure 2" below) the
+  first time someone opens the builder for it, or by `aiChat` writing its
+  own edited files on the first follow-up edit. This isn't a bug so much as
+  a design that ended up different from the plan: GitHub, not Firestore, is
+  the real source of truth for a fresh generation.
+- ⚠️ **Phase 2 — sync mechanics, half never built.** `syncRepoToGitHub` as a
+  standalone reusable function, the `onRepoFileWrite` Firestore trigger, the
+  `scheduledRepoSync` 5-minute sweep, and the `tryClaimSync` concurrency
+  transaction described below **do not exist in the codebase** — confirmed
+  by `functions/index.js`'s own comment directly above `requestRepoSync`
+  (`index.js:1538`) and by `functions/agents/05-agent-loop/pipeline.js`'s
+  header comment. What actually keeps GitHub in sync instead, all
+  explicit/synchronous rather than trigger-driven:
+  1. **`aiChat` commits every edit to GitHub inline, in the same request** —
+     not eventually. After the pipeline produces `<file>` blocks, `aiChat`
+     writes them to `files/{path}` in Firestore *and* calls
+     `commitFilesToGithub` before the response ends (`index.js:1134`-1203).
+     There is no counter, no threshold, no batching — one edit, one commit,
+     synchronously, before the user's stream finishes.
+  2. **`requestRepoSync`** (`index.js:1548`) — an explicit-flush HTTP
+     endpoint, called by `SaveButton.tsx`. Reads the entire current `files`
+     subcollection and commits it to GitHub. This is real and deployed —
+     it's specifically the piece the original trigger/sweep design was
+     supposed to make unnecessary, kept as the actual mechanism instead.
+  3. **`publishWebsite`** (`index.js:1597`) always force-syncs the current
+     `files` subcollection to GitHub before triggering a Vercel deployment
+     (non-fatally — a sync failure there is logged and publish continues),
+     specifically *because* there's no trigger/sweep to otherwise guarantee
+     GitHub isn't stale by publish time.
+  There is currently no backstop for a repo that has unsynced Firestore edits,
+  was never explicitly Saved, and is never Published — those edits simply
+  stay `dirty` in Firestore indefinitely. Since `aiChat` (the far more common
+  edit path) already syncs synchronously per point 1, this gap is narrower
+  in practice than the original design implied, but it's real for any write
+  path that only touches Firestore.
 - ✅ **Phase 3 — repoint `aiChat`.** It now resolves + verifies repo
   ownership before calling the AI provider at all. **Superseded/updated by
   [MULTI_AGENT_ORCHESTRATION.md](./MULTI_AGENT_ORCHESTRATION.md):** `aiChat`
   no longer makes one streaming OpenRouter call — it runs the multi-agent
-  pipeline (`functions/pipeline.js`) and writes SSE frames to the client
-  itself as each coder's result comes in, in the same wire shape a raw
-  OpenRouter passthrough used, so the client-side reader is unaffected.
-  Once the pipeline finishes, it parses `<file>` blocks out of the
-  accumulated text and batch-writes them to `files/{path}` — `onRepoFileWrite`
-  picks those writes up and drives the sync from there, unchanged. The real
-  client-side consumer of this stream is
+  pipeline (moved from `functions/pipeline.js` to
+  `functions/agents/05-agent-loop/pipeline.js` in the `agents/` reorg; the
+  former Request Taker agent is now merged into Goal Setter, cutting every
+  edit from 3 model calls to 2) and writes SSE frames to the client itself as
+  each coder's result comes in, in the same wire shape a raw OpenRouter
+  passthrough used, so the client-side reader is unaffected. Once the
+  pipeline finishes, `aiChat` batch-writes the resulting `<file>` blocks to
+  `files/{path}` **and commits them to GitHub in the same request** — see
+  Phase 2 above; there is no separate trigger picking these writes up. The
+  real client-side consumer of this stream is
   `src/features/builder/lib/aiChat.ts` → `AssistantPanel.tsx` (not
   `Preview.tsx`, which is currently unmounted — see the routing note under
   Phases 4/5/7 below). Accepts an explicit `repoId` in the request body
@@ -99,10 +173,27 @@ Firebase Auth + Cloud Function + Firestore REST calls against the real
 - ✅ **Phase 6 — ownership checks**, folded into phase 3's work rather than
   done separately. Added a shared `resolveOwnedRepo(uid, { repoId } | {
   repoOwner, repoName })` helper and applied it to `aiChat`,
-  `getRepoContents`, `getRepoTree`, and `requestRepoSync` — every function
-  that takes owner/repo (or repoId) from the client now verifies
-  `user_id === decodedToken.uid` before touching GitHub or Firestore for
-  that repo, closing the finding in `docs/CODE_REVIEW.md`.
+  `getRepoContents`, `getRepoTree`, `requestRepoSync`, and — added later,
+  alongside the publish feature — `publishWebsite` and
+  `getDeploymentStatus` too: every function that takes owner/repo (or
+  repoId) from the client verifies `user_id === decodedToken.uid` before
+  touching GitHub, Firestore, or Vercel for that repo, closing the finding
+  in `docs/CODE_REVIEW.md`.
+- ✅ **Phase 8 — publish/deploy, not part of the original plan.** Added
+  after this document's phases 1-7 were drafted, so it has no earlier phase
+  number to slot into. `publishWebsite` (`index.js:1597`) force-syncs
+  Firestore's current `files` subcollection to GitHub (see Phase 2), injects
+  a pending Google site-verification meta tag into `index.html` if one is
+  waiting, then calls Vercel: `ensureVercelProject` (create-if-missing),
+  `createProductionDeployment` (trigger a build from the GitHub repo),
+  `pollDeployment` (wait a bounded window for it to finish before
+  returning). `getDeploymentStatus` lets the frontend keep polling past that
+  bounded window. `connectDomain`/`getDomainStatus`/`disconnectDomain` layer
+  custom-domain support onto the same Vercel project. All of it writes back
+  onto the `user_repos/{id}` doc (`vercel_project_id`,
+  `vercel_deployment_status`, `vercel_production_url`,
+  `custom_domain`/`custom_domain_status`) — the same doc Phase 1's
+  sync-status fields live on, not a separate collection.
 - ✅ **Phase 4 — frontend wiring, resolved.** The two-competing-plans tension
   described below resolved itself: `RepoManagement.tsx`/`Preview.tsx` (the
   other plan's starting point) are deleted (see `git log` — they're gone,
@@ -163,8 +254,10 @@ Fixed in `repos.service.ts`:
 **Resolved:** `createRepoFromTemplate` no longer sets the placeholder
 `github.com/empirial-templates/...` repo_url/repo_owner — it wasn't a real,
 accessible repo for the shared `GITHUB_TOKEN`, and had a truthy `repo_url`
-that would have slipped past `syncRepoToGitHub`'s "no repo yet" guard.
-Confirmed via grep that this function is currently unreachable from the UI
+that would have slipped past `requestRepoSync`'s "no repo yet" guard (see
+Phase 2 above — there is no separate `syncRepoToGitHub` function; this guard
+lives inline in `requestRepoSync`/`publishWebsite` themselves). Confirmed
+via grep that this function is currently unreachable from the UI
 (Platform.tsx's template cards go through `createRepoFromPrompt` instead),
 so this was dormant, not live — fixed anyway since it's exported and could
 get wired up later. It now follows `createRepoFromPrompt`'s convention:
@@ -179,10 +272,12 @@ subcollection from the client — this was the actual cause of the
 see "Deployment state" above for the rule shape.
 
 `SaveButton.tsx` also now calls `requestRepoSync` (fire-and-forget, after the
-Firestore write succeeds) instead of leaving every save to wait on the
-3-edit threshold or the 5-minute sweep — confirmed by reading the code that
-this call was missing entirely; "Save" previously only ever wrote to
-Firestore and never pushed anything to GitHub on its own.
+Firestore write succeeds) — confirmed by reading the code that this call was
+missing entirely; "Save" previously only ever wrote to Firestore and never
+pushed anything to GitHub on its own. This is the *only* automatic sync path
+for a manual Firestore-only edit outside of `aiChat` (which syncs inline on
+every turn regardless — see Phase 2 above); there was never a
+threshold/sweep fallback for `SaveButton.tsx` to lean on instead.
 
 ## Figure 2 (cold-start GitHub fallback) — now actually implemented
 
@@ -207,67 +302,94 @@ on the starter template. Added:
 Collapse the three uncoordinated generation paths (`functions/index.js` + GitHub,
 `src/features/builder/` + mocked UI, `src/lib/claude.ts` legacy) into one engine:
 GitHub is the durable, canonical store; Firestore is a fast write-behind cache
-that live preview reads from; a server-driven sync policy keeps the two
-consistent without making every AI edit wait on a GitHub round trip.
+that live preview reads from. **The original goal also called for a
+server-driven, trigger-based sync policy so no AI edit would ever wait on a
+GitHub round trip — that half was never built** (see Phase 2 above). What
+shipped instead is simpler and more synchronous than planned: `aiChat`
+commits to GitHub inline, in the same request, before its response ends.
 
-## Read path vs write path
+## Read path vs write path, as actually built
 
-The whole design rests on never letting live preview block on GitHub:
-
-- **Write path (every AI edit):** write one small Firestore doc → preview updates
-  instantly from local state. GitHub is not in this loop.
-- **Sync path (batched, backgrounded):** triggered by an edit counter, an idle
-  timer, an explicit Save, or a scheduled sweep — reads the current Firestore
-  state and commits it to GitHub. Runs behind the user, never blocks typing.
-- **Cold-start read path (opening a project):** check the Firestore cache first
-  (fresher, if there are unsynced edits); fall back to GitHub (`getRepoTree`)
-  only if the cache is empty.
-
-See the diagram below for the full shape.
+- **Write path (every AI edit via `aiChat`):** write the changed file docs to
+  Firestore, then commit them to GitHub — both inline, in the same request,
+  before the SSE stream ends. Not backgrounded: the user's turn genuinely
+  waits on the GitHub commit, contrary to the original "never block on
+  GitHub" goal above. In practice this is fine because a single small commit
+  (a handful of section files) is fast relative to the LLM calls already in
+  the same request.
+- **Explicit sync path (`requestRepoSync` / `SaveButton.tsx`):** the only
+  other way Firestore's cache reaches GitHub — reads the current `files`
+  subcollection and commits it, fire-and-forget from the client after a
+  manual Firestore-only save. There's no scheduled or triggered fallback
+  behind it (see Phase 2).
+- **Publish-time force-sync (`publishWebsite`):** always flushes Firestore's
+  current `files` subcollection to GitHub before deploying, specifically to
+  paper over the missing trigger/sweep — publish should never ship stale
+  content even if something upstream failed to sync.
+- **Cold-start read path (opening a project):** check the Firestore cache
+  first; fall back to GitHub (`getRepoTree`, via
+  `hydrateRepoFilesFromGithubIfEmpty`) only if the cache is empty — see
+  "Figure 2" above. This is the *only* path where GitHub is read as a
+  fallback rather than written to.
 
 ```mermaid
 flowchart LR
     subgraph client["Builder UI (client)"]
         U[User edit / prompt]
         PV[Sandpack preview]
+        SAVE[SaveButton.tsx]
     end
 
     subgraph fns["Cloud Functions"]
         AC[aiChat]
-        SYNC[syncRepoToGitHub]
-        SWEEP[scheduled sweep\nevery 5 min]
+        RRS[requestRepoSync]
+        PUB[publishWebsite]
     end
 
     subgraph fs["Firestore (fast cache)"]
-        FILES[(repos/id/files/path)]
-        STATUS[(sync_status: dirty/clean\npending_edit_count)]
+        FILES[(user_repos/id/files/path)]
+        STATUS[(github_sync_status,\nlast_synced_at, last_commit_sha)]
     end
 
     GH[(GitHub repo — durable source)]
+    VC[(Vercel deployment)]
 
-    U -->|prompt| AC
-    AC -->|write file doc, ~instant| FILES
+    U -->|prompt / edit| AC
+    AC -->|write file docs| FILES
+    AC -->|commit inline, same request| GH
     AC --> STATUS
-    FILES -->|local state read, 0 round trips| PV
+    FILES -->|local state read| PV
 
-    FILES -.->|onWrite trigger| STATUS
-    STATUS -->|"3rd edit OR 90s idle OR Save click"| SYNC
-    SWEEP -.->|catches anything still dirty| SYNC
-    SYNC -->|reads current files| FILES
-    SYNC -->|blob → tree → commit → update ref| GH
-    SYNC -->|mark clean, last_synced_at| STATUS
+    SAVE -->|explicit flush, fire-and-forget| RRS
+    RRS -->|reads current files| FILES
+    RRS -->|commit| GH
+    RRS --> STATUS
+
+    PUB -->|force-sync first| FILES
+    PUB -->|commit| GH
+    PUB -->|deploy from repo| VC
 
     U -.->|open project, cold start only| FILES
     FILES -.->|cache empty?| GH
     GH -.->|getRepoTree, hydrate once| PV
 ```
 
+**No node in this diagram is a Firestore trigger or a scheduled function —
+every arrow into GitHub is a direct call from `aiChat`, `requestRepoSync`, or
+`publishWebsite` in response to something a user did.** The diagram in
+[engine-diagram.html](./engine-diagram.html) has not been updated to match
+this and still shows the trigger/sweep design below.
+
 ## Everything below this line is the original implementation plan
 
-Kept for design rationale, not as an open TODO — every numbered item and
-bullet from here through "Suggested implementation order" is done. See
-"Implementation status" and "Deployment state" at the top of this document
-for what's actually true today; treat past tense as implied throughout.
+Kept for design rationale, not as an open TODO. **Read this section as
+history, not as current behavior** — several of its central mechanisms (the
+`onRepoFileWrite` trigger, `scheduledRepoSync`, the standalone
+`syncRepoToGitHub` function, the edit-counter/idle-window sync policy) were
+never actually implemented; see "Implementation status" above (Phase 2
+especially) for what really ships today instead. Everything else here (the
+Firestore schema shape, the ownership-check work, the frontend routing) is
+still accurate.
 
 ## Firestore schema changes
 
@@ -281,6 +403,13 @@ for what's actually true today; treat past tense as implied throughout.
   every file in the project.
 
 ## Cloud Functions changes
+
+**Items 2-4 below (a standalone `syncRepoToGitHub`, the Firestore trigger,
+the scheduled sweep) were never built** — see "Implementation status"'s
+Phase 2. What exists instead: the sync logic lives inline inside `aiChat`
+(commits immediately, no threshold) and inside `requestRepoSync` (explicit
+flush only, no trigger calls it). Kept below verbatim for the original
+rationale.
 
 1. **`aiChat`** — after parsing `<file>` blocks from the model response, write
    each changed file to `files/{path}` (not just stream text back), bump
