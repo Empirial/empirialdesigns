@@ -92,6 +92,45 @@ export const setAgentTeamLead = onCall<SetAgentTeamLeadInput>(async (request) =>
   return { agentId, teamLeadId };
 });
 
+interface SetAgentJobTitleInput {
+  agentId: string;
+  jobTitle: "Sales Agent" | "Senior Agent" | "Team Lead";
+}
+
+/** Promotes or demotes an existing agent without changing their staff access
+ * role. A Team Lead must have their team reassigned before being demoted. */
+export const setAgentJobTitle = onCall<SetAgentJobTitleInput>(async (request) => {
+  const { uid: adminUid } = requireAdmin(request);
+  const { agentId, jobTitle } = request.data ?? ({} as SetAgentJobTitleInput);
+  if (!agentId || typeof agentId !== "string" || !["Sales Agent", "Senior Agent", "Team Lead"].includes(jobTitle)) {
+    throw new HttpsError("invalid-argument", "A valid agentId and jobTitle are required.");
+  }
+  const agentRef = db.doc(`agents/${agentId}`);
+  const agentSnap = await agentRef.get();
+  if (!agentSnap.exists) throw new HttpsError("not-found", "Agent not found.");
+  const previousJobTitle = agentSnap.data()?.role ?? "Sales Agent";
+
+  if (previousJobTitle === "Team Lead" && jobTitle !== "Team Lead") {
+    const teamMembers = await db.collection("agents").where("teamLeadId", "==", agentId).limit(1).get();
+    if (!teamMembers.empty) {
+      throw new HttpsError("failed-precondition", "Reassign this Team Lead's agents before demoting them.");
+    }
+  }
+
+  const batch = db.batch();
+  batch.update(agentRef, { role: jobTitle });
+  writeAuditLog(batch, {
+    actorUid: adminUid,
+    action: "agents.setJobTitle",
+    targetCollection: "agents",
+    targetId: agentId,
+    before: { role: previousJobTitle },
+    after: { role: jobTitle },
+  });
+  await batch.commit();
+  return { agentId, jobTitle };
+});
+
 /** Returns a Team Lead's roster through the server, rather than granting an
  * agent broad Firestore list access to everyone's profile. */
 export const getMyTeam = onCall(async (request) => {
@@ -101,6 +140,30 @@ export const getMyTeam = onCall(async (request) => {
     throw new HttpsError("permission-denied", "Team Lead access required.");
   }
   const members = await db.collection("agents").where("teamLeadId", "==", uid).get();
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfToday.getDate() - ((startOfToday.getDay() + 6) % 7));
+  // Fetch each member's lightweight call records in parallel. This preserves
+  // per-team access boundaries and avoids exposing the callLogs collection to
+  // the client, while keeping the page's call counts based on real call logs.
+  const memberCalls = await Promise.all(
+    members.docs.map(async (member) => ({
+      id: member.id,
+      calls: await db.collection("callLogs").where("agentUid", "==", member.id).get(),
+    })),
+  );
+  const callCounts = new Map(memberCalls.map(({ id, calls }) => {
+    let today = 0;
+    let week = 0;
+    for (const call of calls.docs) {
+      const at = call.data().at?.toDate?.() as Date | undefined;
+      if (!at) continue;
+      if (at >= startOfWeek) week += 1;
+      if (at >= startOfToday) today += 1;
+    }
+    return [id, { today, week }];
+  }));
   return {
     team: members.docs.map((member) => {
       const data = member.data();
@@ -115,6 +178,8 @@ export const getMyTeam = onCall(async (request) => {
         online: data.online ?? false,
         monthlyTarget: data.monthlyTarget ?? 0,
         targetDeals: data.targetDeals ?? 0,
+        callsToday: callCounts.get(member.id)?.today ?? 0,
+        callsThisWeek: callCounts.get(member.id)?.week ?? 0,
       };
     }),
   };

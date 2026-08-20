@@ -108,6 +108,11 @@ export const callResetUserPassword = httpsCallable<{ uid: string }, { uid: strin
   "resetUserPassword",
 );
 
+export const callPermanentlyDeleteUser = httpsCallable<{ uid: string }, { uid: string }>(
+  firebaseFunctions,
+  "permanentlyDeleteUser",
+);
+
 export interface TeamMember {
   id: string;
   name: string;
@@ -119,6 +124,8 @@ export interface TeamMember {
   online: boolean;
   monthlyTarget: number;
   targetDeals: number;
+  callsToday: number;
+  callsThisWeek: number;
 }
 
 export const callGetMyTeam = httpsCallable<void, { team: TeamMember[] }>(firebaseFunctions, "getMyTeam");
@@ -127,6 +134,11 @@ export const callSetAgentTeamLead = httpsCallable<
   { agentId: string; teamLeadId: string | null },
   { agentId: string; teamLeadId: string | null }
 >(firebaseFunctions, "setAgentTeamLead");
+
+export const callSetAgentJobTitle = httpsCallable<
+  { agentId: string; jobTitle: "Sales Agent" | "Senior Agent" | "Team Lead" },
+  { agentId: string; jobTitle: "Sales Agent" | "Senior Agent" | "Team Lead" }
+>(firebaseFunctions, "setAgentJobTitle");
 
 export interface SeedDemoDataResult {
   servicesSeeded: number;

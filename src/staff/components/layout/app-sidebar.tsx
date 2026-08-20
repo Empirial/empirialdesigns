@@ -1,4 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
   Bot,
@@ -37,8 +38,7 @@ import { Pill } from "@staff/components/shared/status-badge";
 import { useLeads } from "@staff/lib/leads";
 import { useMyFollowUps } from "@staff/lib/followups-data";
 import { cn } from "@staff/lib/utils";
-import { signOutUser } from "@staff/lib/auth";
-import { firebaseAuth, getMockStaffProfile } from "@staff/lib/auth";
+import { getCurrentAuthUser, getMockStaffProfile, signOutUser } from "@staff/lib/auth";
 import { useAgentDoc } from "@staff/lib/agents-data";
 import { Button } from "@staff/components/ui/button";
 import empirialIcon from "@/assets/Brand ID/empirial-icon.png";
@@ -85,9 +85,19 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const { data: leads = [] } = useLeads({ enabled: portal === "admin" });
   const { data: followUps = [] } = useMyFollowUps({ enabled: portal === "agent" });
-  const ownUid = firebaseAuth.currentUser?.uid ?? (getMockStaffProfile() ? "ag-1" : undefined);
+  // Firebase restores a persisted user asynchronously. Resolving through the
+  // shared Auth listener prevents My Team disappearing during that brief
+  // restore window, unlike reading firebaseAuth.currentUser synchronously.
+  const { data: authUser } = useQuery({
+    queryKey: ["staff", "current-auth-user"],
+    queryFn: getCurrentAuthUser,
+    enabled: portal === "agent" && !getMockStaffProfile(),
+    staleTime: Infinity,
+  });
+  const ownUid = authUser?.uid ?? (getMockStaffProfile() ? "ag-1" : undefined);
   const { data: ownAgent } = useAgentDoc(portal === "agent" ? ownUid : undefined);
-  const agentItems = ownAgent?.role === "Team Lead"
+  const showTeam = ownAgent?.role === "Team Lead" || pathname.startsWith("/agent/team");
+  const agentItems = showTeam
     ? [...AGENT_NAV.slice(0, 1), { title: "My Team", to: "/agent/team", icon: Users }, ...AGENT_NAV.slice(1)]
     : AGENT_NAV;
   const items = portal === "agent" ? agentItems : ADMIN_NAV;

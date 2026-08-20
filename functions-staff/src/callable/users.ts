@@ -275,6 +275,46 @@ export const removeUser = onCall<RemoveUserInput>(async (request) => {
   return { uid };
 });
 
+/** Permanently removes an agent's login and active profile. Historical leads,
+ * deals, and audit records are deliberately retained for business and payout
+ * traceability, but can no longer be connected to a live account. */
+export const permanentlyDeleteUser = onCall<RemoveUserInput>(async (request) => {
+  const { uid: adminUid } = requireAdmin(request);
+  const { uid } = request.data ?? ({} as RemoveUserInput);
+  if (!uid || typeof uid !== "string") throw new HttpsError("invalid-argument", "uid is required.");
+  if (uid === adminUid) throw new HttpsError("failed-precondition", "You can't permanently delete your own account.");
+
+  const userRef = db.doc(`staffUsers/${uid}`);
+  const agentRef = db.doc(`agents/${uid}`);
+  const [userSnap, agentSnap] = await Promise.all([userRef.get(), agentRef.get()]);
+  if (!userSnap.exists) throw new HttpsError("not-found", "User not found.");
+
+  if (agentSnap.exists && agentSnap.data()?.role === "Team Lead") {
+    const teamMembers = await db.collection("agents").where("teamLeadId", "==", uid).limit(1).get();
+    if (!teamMembers.empty) {
+      throw new HttpsError("failed-precondition", "Reassign this Team Lead's agents before deleting the account.");
+    }
+  }
+
+  const batch = db.batch();
+  batch.delete(userRef);
+  if (agentSnap.exists) batch.delete(agentRef);
+  writeAuditLog(batch, {
+    actorUid: adminUid,
+    action: "users.permanentlyDelete",
+    targetCollection: "staffUsers",
+    targetId: uid,
+    before: { email: userSnap.data()?.email ?? null, role: userSnap.data()?.role ?? null },
+  });
+  await batch.commit();
+
+  // Deleting Auth after the profile batch means a transient failure still
+  // locks the account out of the portal (there is no staffUsers profile),
+  // rather than leaving an active profile with a missing login.
+  await auth.deleteUser(uid);
+  return { uid };
+});
+
 interface ResetUserPasswordInput {
   uid: string;
 }

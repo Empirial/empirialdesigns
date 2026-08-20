@@ -76,7 +76,7 @@ import { computeAgentStats } from "@staff/components/agents-admin/agent-stats";
 import { ReassignLeadsDialog } from "@staff/components/agents-admin/reassign-leads-dialog";
 import type { Agent } from "@staff/lib/types";
 import { cn } from "@staff/lib/utils";
-import { callInviteUser, callRemoveUser, callResetUserPassword, callSetAgentTeamLead, callToggleAgentStatus } from "@staff/lib/functions";
+import { callInviteUser, callPermanentlyDeleteUser, callRemoveUser, callResetUserPassword, callSetAgentJobTitle, callSetAgentTeamLead, callToggleAgentStatus } from "@staff/lib/functions";
 
 export const Route = createFileRoute("/admin/agents/")({
   head: () => ({
@@ -106,16 +106,20 @@ function PageAdminAgentsIndex() {
   const [adding, setAdding] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState<Agent | null>(null);
   const [removeTarget, setRemoveTarget] = useState<Agent | null>(null);
+  const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<Agent | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [tempPasswordResult, setTempPasswordResult] = useState<
     { email: string; tempPassword: string; mode: "created" | "reset" } | null
   >(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [permanentlyDeletingId, setPermanentlyDeletingId] = useState<string | null>(null);
   const [reassignTarget, setReassignTarget] = useState<Agent | null>(null);
   const [teamTarget, setTeamTarget] = useState<Agent | null>(null);
   const [selectedTeamLeadId, setSelectedTeamLeadId] = useState("none");
   const [assigningTeam, setAssigningTeam] = useState(false);
+  const [changingTitleId, setChangingTitleId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -205,6 +209,19 @@ function PageAdminAgentsIndex() {
     }
   }
 
+  async function handleJobTitle(agent: Agent, jobTitle: Agent["role"]) {
+    setChangingTitleId(agent.id);
+    try {
+      await callSetAgentJobTitle({ agentId: agent.id, jobTitle });
+      await queryClient.invalidateQueries({ queryKey: ["agents"] });
+      toast.success(jobTitle === "Team Lead" ? `${agent.name} promoted to Team Lead` : `${agent.name} is no longer a Team Lead`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't update the agent's role — try again.");
+    } finally {
+      setChangingTitleId(null);
+    }
+  }
+
   async function handleResetPassword(agent: Agent) {
     setResettingId(agent.id);
     try {
@@ -230,6 +247,23 @@ function PageAdminAgentsIndex() {
       toast.error(err instanceof Error ? err.message : "Couldn't remove that agent — try again.");
     } finally {
       setRemovingId(null);
+    }
+  }
+
+  async function handlePermanentDelete() {
+    if (!permanentDeleteTarget || deleteConfirmation !== "DELETE") return;
+    const agent = permanentDeleteTarget;
+    setPermanentlyDeletingId(agent.id);
+    try {
+      await callPermanentlyDeleteUser({ uid: agent.id });
+      await queryClient.invalidateQueries({ queryKey: ["agents"] });
+      toast.success(`${agent.name}'s account was permanently deleted`);
+      setPermanentDeleteTarget(null);
+      setDeleteConfirmation("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't permanently delete that account — try again.");
+    } finally {
+      setPermanentlyDeletingId(null);
     }
   }
 
@@ -505,9 +539,12 @@ function PageAdminAgentsIndex() {
                 onToggleStatus={() => toggleStatus(s.agent)}
                 onReassign={() => setReassignTarget(s.agent)}
                 onAssignTeam={() => { setTeamTarget(s.agent); setSelectedTeamLeadId(s.agent.teamLeadId ?? "none"); }}
+                changingTitle={changingTitleId === s.agent.id}
+                onToggleTeamLead={() => handleJobTitle(s.agent, s.agent.role === "Team Lead" ? "Sales Agent" : "Team Lead")}
                 onResetPassword={() => handleResetPassword(s.agent)}
                 onDeactivate={() => setDeactivateTarget(s.agent)}
                 onRemove={() => setRemoveTarget(s.agent)}
+                onPermanentDelete={() => setPermanentDeleteTarget(s.agent)}
               />
             ))}
           </div>
@@ -585,6 +622,9 @@ function PageAdminAgentsIndex() {
                           <DropdownMenuItem onClick={() => { setTeamTarget(s.agent); setSelectedTeamLeadId(s.agent.teamLeadId ?? "none"); }}>
                             Assign Team Lead
                           </DropdownMenuItem>
+                          <DropdownMenuItem disabled={changingTitleId === s.agent.id} onClick={() => handleJobTitle(s.agent, s.agent.role === "Team Lead" ? "Sales Agent" : "Team Lead")}>
+                            {changingTitleId === s.agent.id ? "Saving…" : s.agent.role === "Team Lead" ? "Demote from Team Lead" : "Promote to Team Lead"}
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             disabled={resettingId === s.agent.id}
                             onClick={() => handleResetPassword(s.agent)}
@@ -598,7 +638,10 @@ function PageAdminAgentsIndex() {
                             className="text-destructive"
                             onClick={() => setRemoveTarget(s.agent)}
                           >
-                            Delete agent
+                            Remove agent (reversible)
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => setPermanentDeleteTarget(s.agent)}>
+                            Delete account permanently
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -683,6 +726,29 @@ function PageAdminAgentsIndex() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog open={!!permanentDeleteTarget} onOpenChange={(open) => {
+        if (!open) { setPermanentDeleteTarget(null); setDeleteConfirmation(""); }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Permanently delete {permanentDeleteTarget?.name}'s account?</DialogTitle>
+            <DialogDescription>
+              This deletes their Firebase login and staff profile. Their leads, deals, and audit history remain for record keeping. Type DELETE to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="permanent-delete-confirmation">Confirmation</Label>
+            <Input id="permanent-delete-confirmation" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} placeholder="Type DELETE" autoComplete="off" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPermanentDeleteTarget(null); setDeleteConfirmation(""); }} disabled={Boolean(permanentlyDeletingId)}>Cancel</Button>
+            <Button variant="destructive" onClick={handlePermanentDelete} disabled={deleteConfirmation !== "DELETE" || Boolean(permanentlyDeletingId)}>
+              {permanentlyDeletingId ? "Deleting…" : "Delete permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ReassignLeadsDialog
         open={!!reassignTarget}
         onOpenChange={(o) => !o && setReassignTarget(null)}
@@ -701,9 +767,12 @@ function AgentCard({
   onToggleStatus,
   onReassign,
   onAssignTeam,
+  changingTitle,
+  onToggleTeamLead,
   onResetPassword,
   onDeactivate,
   onRemove,
+  onPermanentDelete,
 }: {
   stats: ReturnType<typeof computeAgentStats>;
   pending?: boolean;
@@ -711,9 +780,12 @@ function AgentCard({
   onToggleStatus: () => void;
   onReassign: () => void;
   onAssignTeam: () => void;
+  changingTitle?: boolean;
+  onToggleTeamLead: () => void;
   onResetPassword: () => void;
   onDeactivate: () => void;
   onRemove: () => void;
+  onPermanentDelete: () => void;
 }) {
   const { agent } = stats;
   const targetPct = Math.min(100, Math.round((stats.revenue / Math.max(1, agent.monthlyTarget)) * 100));
@@ -731,6 +803,9 @@ function AgentCard({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={onReassign}>Reassign leads</DropdownMenuItem>
             <DropdownMenuItem onClick={onAssignTeam}>Assign Team Lead</DropdownMenuItem>
+            <DropdownMenuItem disabled={changingTitle} onClick={onToggleTeamLead}>
+              {changingTitle ? "Saving…" : agent.role === "Team Lead" ? "Demote from Team Lead" : "Promote to Team Lead"}
+            </DropdownMenuItem>
             <DropdownMenuItem disabled={resetting} onClick={onResetPassword}>
               {resetting ? "Resetting…" : "Reset password"}
             </DropdownMenuItem>
@@ -738,7 +813,10 @@ function AgentCard({
               {agent.status === "Active" ? "Deactivate" : "Reactivate"}
             </DropdownMenuItem>
             <DropdownMenuItem className="text-destructive" onClick={onRemove}>
-              Delete agent
+              Remove agent (reversible)
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={onPermanentDelete}>
+              Delete account permanently
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
