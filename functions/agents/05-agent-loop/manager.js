@@ -4,8 +4,8 @@
 // create, reused from section_manifest on edit so an unrelated copy tweak
 // doesn't silently reshuffle the layout), dispatches the coders, and merges
 // their results + the new section_manifest.
-const { CONTENT_SECTIONS, LINK_SECTIONS, ALL_SECTIONS, pickWireframeId, buildFileBlock } = require('./shared');
-const { runCoder } = require('./coders/base');
+const { CONTENT_SECTIONS, LINK_SECTIONS, ALL_SECTIONS, pickWireframeId, buildFileBlock } = require('../shared');
+const { runCoder } = require('./coders/runCoder');
 
 const CODER_CONFIG = {
   nav: require('./coders/nav'),
@@ -30,10 +30,14 @@ const CODER_CONFIG = {
  *   a business's real Google reviews (integrations/google/places.js), only
  *   ever consulted by the testimonials coder (see coders/base.js's
  *   applyRealReviews) — every other section ignores this entirely.
+ * @param {string} [opts.googlePlaceId] - the repo's linked Google Place id,
+ *   if any. Only ever consulted by the footer coder (see coders/runCoder.js's
+ *   injectMapEmbed call) to add a real map embed — every other section
+ *   ignores this entirely.
  * @param {(section: string) => Promise<string>} opts.getFileContent
  * @param {(chunk: string) => void} opts.onProgress
  */
-async function dispatch({ intent, apiKey, model, goalSetter, sectionManifest, style, realReviews, getFileContent, onProgress }) {
+async function dispatch({ intent, apiKey, model, goalSetter, sectionManifest, style, realReviews, googlePlaceId, getFileContent, onProgress }) {
   const files = [];
   const failedSections = [];
   const priorById = new Map((sectionManifest || []).map((m) => [m.id, m]));
@@ -56,6 +60,7 @@ async function dispatch({ intent, apiKey, model, goalSetter, sectionManifest, st
         isNewLayout,
         style,
         realReviews,
+        googlePlaceId,
       });
       files.push({ ...result, wireframeId });
       onProgress(buildFileBlock(result.path, result.content));

@@ -604,6 +604,15 @@ export async function setThemeColor(
   return callFunction<ThemeColorResult>('setThemeColor', idToken, { repoId, ...palette });
 }
 
+/** Sets/updates a project's GA4 Measurement ID, or clears it (pass an empty string) to remove tracking — see functions/index.js's setGoogleAnalytics. */
+export async function setGoogleAnalytics(
+  repoId: string,
+  idToken: string,
+  measurementId: string
+): Promise<{ success: boolean; path: string; content: string; measurementId: string | null }> {
+  return callFunction('setGoogleAnalytics', idToken, { repoId, measurementId });
+}
+
 /** Forces an immediate GitHub sync of the current Firestore file cache. */
 export async function requestRepoSync(repoId: string, idToken: string): Promise<{ success: boolean; synced: boolean }> {
   return callFunction('requestRepoSync', idToken, { repoId });

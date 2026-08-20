@@ -342,6 +342,9 @@ the original estimate assumed:
 
 - The cross-section dependency table starts as ~3 hardcoded rules — worth
   expanding once real usage shows what actually cascades in practice.
-- Per-project color: resolved — see "Color palette" above. Open sub-question:
-  should a chat edit be able to recolor an existing site? Today `palette` is
-  locked at creation and an edit never re-touches `index.css`.
+- Per-project color: resolved, including recoloring via chat — see "Color
+  palette" above. `palette` is locked at creation and carried forward
+  unchanged on an edit, UNLESS Goal Setter classifies that edit as an
+  explicit color/theme/branding request (`recolor: true`, backed by a
+  deterministic keyword net checked against both the raw and normalized
+  message), in which case pipeline.js emits a fresh `src/index.css`.

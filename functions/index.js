@@ -14,8 +14,9 @@ const fetch = require("node-fetch");
 // package.json — but keeping heavy requires lazy is still the right call).
 // pipeline.js itself is cheap to load (no heavy transitive deps beyond
 // node-fetch, already required above), so it's safe to require eagerly.
-const { runPipeline, SECTION_FILES } = require("./pipeline");
+const { runPipeline, SECTION_FILES } = require("./agents/05-agent-loop/pipeline");
 const { buildIndexCssFile, clampHue, clampSaturation } = require("./agents/shared");
+const { buildRepoStatusSnapshot } = require("./agents/06-memory-context/repoStatus");
 // Cheap to require eagerly, same as pipeline.js above — preview.js's own
 // heavy deps (esbuild, puppeteer-core, @sparticuz/chromium) are required
 // lazily inside its functions, not at its module scope.
@@ -40,6 +41,7 @@ const { createMonitor: createUptimeMonitor, getMonitorStatus: getUptimeMonitorSt
 const { findPlace: findGooglePlaceCandidates, getPlaceReviews } = require("./integrations/google/places");
 const { listAccounts: listBusinessAccounts, listLocations: listBusinessLocations, getLocation: getBusinessLocation, updateLocation: updateBusinessLocation, createLocalPost } = require("./integrations/google/businessProfile");
 const { addDomainToProject, getDomainConfig, removeDomainFromProject } = require("./integrations/vercel/domains");
+const { isValidMeasurementId: isValidGaMeasurementId, upsertAnalyticsTag } = require("./integrations/google/analytics");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -804,6 +806,7 @@ exports.createWebsite = functions.runWith({ memory: '1GB', timeoutSeconds: 300 }
         apiKey: DEEPSEEK_API_KEY,
         model: DEEPSEEK_MODEL,
         realReviews,
+        googlePlaceId,
         getFileContent: async () => 'none — new file',
       });
 
@@ -1059,19 +1062,32 @@ exports.aiChat = functions.https.onRequest((req, res) => {
       let priorStyle;
       let priorPalette;
       let googlePlaceId;
+      let repoData = null;
       try {
         const repoDoc = await db.collection('user_repos').doc(repoId).get();
-        sectionManifest = repoDoc.exists ? repoDoc.data().section_manifest : undefined;
+        repoData = repoDoc.exists ? repoDoc.data() : null;
+        sectionManifest = repoData ? repoData.section_manifest : undefined;
         // Style and palette are both decided once at creation and carried
         // forward on every edit (see pipeline.js's priorStyle/priorPalette)
         // — a repo created before these fields existed just falls back to
         // 'default'/DEFAULT_PALETTE inside the pipeline.
-        priorStyle = repoDoc.exists ? repoDoc.data().style : undefined;
-        priorPalette = repoDoc.exists ? repoDoc.data().palette : undefined;
-        googlePlaceId = repoDoc.exists ? repoDoc.data().google_place_id : undefined;
+        priorStyle = repoData ? repoData.style : undefined;
+        priorPalette = repoData ? repoData.palette : undefined;
+        googlePlaceId = repoData ? repoData.google_place_id : undefined;
       } catch (manifestReadError) {
         console.error('aiChat: failed to read section_manifest, continuing without it:', manifestReadError);
       }
+
+      // Status-query context (layer 6/3/4 — see agents/README.md): a cheap
+      // Firestore-only snapshot for Goal Setter to classify against and
+      // answer most status questions from directly, plus the execution
+      // context the 3 read-only status tools need for a live refresh
+      // (PageSpeed score, review count, search performance) when the
+      // cached snapshot isn't enough. Built unconditionally — cheap (no
+      // extra read, repoData is already in hand) — and simply unused by
+      // the pipeline on any turn that isn't a status_query.
+      const statusSnapshot = buildRepoStatusSnapshot(repoData);
+      const statusToolCtx = { repo: repoData || {}, uid: userId, db, repoId, getValidAccessToken };
 
       // Same best-effort real-reviews lookup as createWebsite — cheap
       // enough to just always fetch when a place is linked rather than
@@ -1108,21 +1124,79 @@ exports.aiChat = functions.https.onRequest((req, res) => {
         priorStyle,
         priorPalette,
         realReviews,
+        googlePlaceId,
         getFileContent: (section) => fetchSectionContentFromGitHub(repoOwner, repoName, SECTION_FILES[section], GITHUB_TOKEN),
+        statusSnapshot,
+        statusToolCtx,
         onProgress: sendChunk,
       });
 
-      // Best-effort: persist the updated manifest so the next edit reuses
-      // these wireframes instead of rerolling them. Doesn't block/fail the
-      // response the user is already watching stream in. Also fires on a
-      // pure recolor (zero affected sections, palette changed) — otherwise
-      // the new palette would never make it past this turn's stream.
-      if (pipelineResult.affectedSections.length > 0 || pipelineResult.recolored) {
+      // Persist + sync, right here in the same request — this is the fix for
+      // the gap requestRepoSync's own comment describes: chat edits used to
+      // only ever land in Firestore (via the frontend's saveRepoFiles after
+      // parsing the streamed <file> blocks) and sat there until an explicit
+      // Save/Publish click flushed them to GitHub, sometimes indefinitely.
+      // Writing the pipeline's file output to Firestore AND committing it to
+      // GitHub before this response ends means chat-driven editing now goes
+      // through the exact same write-then-sync path createWebsite already
+      // uses on create — the two are one pipeline all the way through, not
+      // just at the LLM-call layer. The frontend's own saveRepoFiles call
+      // (from parsing the stream) still runs after this and just re-writes
+      // the same content — harmless, and keeps Sandpack's local Firestore
+      // listener path unchanged.
+      const nowIso = new Date().toISOString();
+      if (pipelineResult.files.length > 0) {
         try {
-          await db.collection('user_repos').doc(repoId).set(
-            { section_manifest: pipelineResult.newSectionManifest, style: pipelineResult.style, palette: pipelineResult.palette, last_updated: new Date().toISOString() },
-            { merge: true }
-          );
+          const batch = db.batch();
+          const repoRef = db.collection('user_repos').doc(repoId);
+          for (const f of pipelineResult.files) {
+            batch.set(repoRef.collection('files').doc(encodeURIComponent(f.path)), {
+              path: f.path,
+              content: f.content,
+              updated_at: nowIso,
+            });
+          }
+          await batch.commit();
+        } catch (persistError) {
+          console.error('aiChat: failed to persist edited files to Firestore:', persistError);
+        }
+      }
+
+      // Best-effort: persist the updated manifest so the next edit reuses
+      // these wireframes instead of rerolling them, plus (when there were
+      // real file changes) commit straight to GitHub and mark the repo
+      // clean. None of this blocks/fails the response the user is already
+      // watching stream in — a failure here just leaves github_sync_status
+      // behind for the next explicit Save/Publish to catch, same fallback
+      // publishWebsite already force-syncs around. Also fires on a pure
+      // recolor (zero affected sections, palette changed) — otherwise the
+      // new palette would never make it past this turn's stream.
+      if (pipelineResult.affectedSections.length > 0 || pipelineResult.recolored) {
+        const repoUpdate = {
+          section_manifest: pipelineResult.newSectionManifest,
+          style: pipelineResult.style,
+          palette: pipelineResult.palette,
+          last_updated: nowIso,
+        };
+        if (pipelineResult.files.length > 0) {
+          try {
+            const branch = process.env.VERCEL_PRODUCTION_BRANCH || 'main';
+            const commitSha = await commitFilesToGithub(
+              repoOwner, repoName, branch, pipelineResult.files,
+              `AI edit: ${pipelineResult.summary}`.slice(0, 200),
+              GITHUB_TOKEN
+            );
+            repoUpdate.github_sync_status = 'clean';
+            repoUpdate.pending_edit_count = 0;
+            repoUpdate.last_synced_at = nowIso;
+            repoUpdate.last_commit_sha = commitSha;
+          } catch (syncError) {
+            console.error('aiChat: failed to sync edited files to GitHub:', syncError);
+            repoUpdate.github_sync_status = 'pending';
+          }
+        }
+        try {
+          await db.collection('user_repos').doc(repoId).set(repoUpdate, { merge: true });
         } catch (manifestWriteError) {
           console.error('aiChat: failed to persist section_manifest:', manifestWriteError);
         }
@@ -1407,6 +1481,55 @@ exports.setThemeColor = functions.https.onRequest((req, res) => {
       return res.status(200).json({ success: true, path: 'src/index.css', content, palette });
     } catch (error) {
       console.error('Error in setThemeColor:', error);
+      return res.status(error.httpStatus || 500).json({ error: error.message });
+    }
+  });
+});
+
+// setGoogleAnalytics — sets/updates/clears the GA4 Measurement ID injected
+// into index.html's <head>. Same "deterministic, zero LLM calls" reasoning
+// as setThemeColor above, for the same reason: a Measurement ID is exact,
+// caller-supplied data, nothing here for a model to get wrong or need to
+// classify from a chat message. Idempotent regardless of index.html's prior
+// state — see integrations/google/analytics.js's own comment.
+exports.setGoogleAnalytics = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(authHeader.split('Bearer ')[1]);
+      const { repoId, measurementId } = req.body;
+      if (!repoId) return res.status(400).json({ error: 'Missing repoId' });
+      const { ref, data: repo } = await resolveOwnedRepo(decodedToken.uid, repoId);
+
+      const trimmed = typeof measurementId === 'string' ? measurementId.trim() : '';
+      if (trimmed && !isValidGaMeasurementId(trimmed)) {
+        return res.status(400).json({ error: "That doesn't look like a GA4 Measurement ID — expected a format like G-XXXXXXXXXX." });
+      }
+
+      // index.html isn't a section file, so — unlike setThemeColor's
+      // src/index.css, which pipeline.js's recolor path also always keeps
+      // fresh in Firestore — it may not have a cached Firestore copy yet on
+      // a repo that's never been edited since creation. Fall back to
+      // GitHub's committed copy in that case, same helper aiChat uses for
+      // section files.
+      const fileRef = ref.collection('files').doc(encodeURIComponent('index.html'));
+      const fileSnap = await fileRef.get();
+      let currentHtml = fileSnap.exists ? fileSnap.data().content : null;
+      const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+      if (currentHtml === null && repo.repo_owner && repo.repo_name && GITHUB_TOKEN) {
+        const fetched = await fetchSectionContentFromGitHub(repo.repo_owner, repo.repo_name, 'index.html', GITHUB_TOKEN);
+        if (fetched !== 'none — new file') currentHtml = fetched;
+      }
+      if (!currentHtml) return res.status(400).json({ error: "Could not find this project's index.html to update." });
+
+      const updatedHtml = upsertAnalyticsTag(currentHtml, trimmed || null);
+      await fileRef.set({ path: 'index.html', content: updatedHtml, updated_at: new Date().toISOString() });
+      await ref.set({ ga_measurement_id: trimmed || null, last_updated: new Date().toISOString() }, { merge: true });
+
+      return res.status(200).json({ success: true, path: 'index.html', content: updatedHtml, measurementId: trimmed || null });
+    } catch (error) {
+      console.error('Error in setGoogleAnalytics:', error);
       return res.status(error.httpStatus || 500).json({ error: error.message });
     }
   });

@@ -1,16 +1,10 @@
-// Low-level building blocks shared by every agent in the pipeline — the one
-// DeepSeek call, JSON/code-fence cleanup, and the fixed 6-section shape.
-// See docs/MULTI_AGENT_ORCHESTRATION.md. Individual agent behavior does NOT
-// live here — see goalSetter.js, manager.js, coders/*.js.
-//
-// Was OpenRouter (kept the free-tier model's 50-requests/day account-wide
-// cap from being usable beyond solo testing — one full-site rebrand alone
-// can burn 8+ of those 50). DeepSeek's API is OpenAI-compatible, same
-// request/response shape, so this is the only file that needed to change.
-
-const fetch = require('node-fetch');
-
-const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
+// Cross-layer building blocks used by more than one of the numbered layer
+// folders — the fixed 6-section shape, style/palette math, and JSON/
+// code-fence text cleanup. Doesn't belong to any single layer (01-10) on
+// its own, so it stays a sibling of them rather than living inside one.
+// See docs/MULTI_AGENT_ORCHESTRATION.md. The model call itself lives in
+// 01-model/provider.js; individual agent behavior lives in
+// 05-agent-loop/{goalSetter,manager,coders/*}.js.
 
 // The doc's fixed 6-section shape. Nav/Footer are the two "link" sections
 // that need to know what the other sections currently are; the rest are
@@ -136,58 +130,6 @@ ${varLines}
 `;
 }
 
-// Sampling profiles — every agent used to share one fixed temperature:0.7
-// regardless of what kind of call it was. Split into two, since the two
-// kinds of call want opposite things:
-//   'decision' — Request Taker / Goal Setter. These return a strict JSON
-//     shape that downstream code parses and trusts (affected_sections,
-//     section_goals, style/palette) — low temperature/top_p keeps the model
-//     literal and consistent instead of creatively reinterpreting the
-//     request. frequency/presence penalty stay at 0: there's no repeated
-//     prose here to discourage repeating.
-//   'copy' — the 6 Coders. They're writing marketing copy into a handful of
-//     {{TOKEN}} fields — higher temperature/top_p gives more natural
-//     variety, and a mild frequency/presence penalty discourages the same
-//     word/phrase showing up twice across a small set of fields (e.g. the
-//     headline and the CTA both reaching for "amazing").
-// Override per-call by passing a different profile (or a one-off object) as
-// callAgent's 5th argument; these are just the defaults for the two
-// existing call sites (goalSetter.js uses 'decision', coders/base.js uses
-// 'copy').
-const SAMPLING_PROFILES = {
-  decision: { temperature: 0.3, top_p: 0.9, frequency_penalty: 0, presence_penalty: 0 },
-  copy: { temperature: 0.8, top_p: 0.95, frequency_penalty: 0.3, presence_penalty: 0.1 },
-};
-
-async function callAgent(apiKey, model, systemPrompt, userContent, sampling = SAMPLING_PROFILES.decision) {
-  const res = await fetch(DEEPSEEK_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContent },
-      ],
-      temperature: sampling.temperature,
-      top_p: sampling.top_p,
-      frequency_penalty: sampling.frequency_penalty,
-      presence_penalty: sampling.presence_penalty,
-    }),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    throw new Error(`Agent call failed (${res.status}): ${detail.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('Agent call returned no content');
-  return content;
-}
-
 // Coders are told not to wrap their answer, but models don't always listen —
 // strip ```lang fences and stray <file> tags defensively so the deterministic
 // wrapping in coders/base.js never doubles up.
@@ -221,8 +163,6 @@ function buildFileBlock(path, content) {
 }
 
 module.exports = {
-  callAgent,
-  SAMPLING_PROFILES,
   extractJson,
   stripCodeFences,
   buildFileBlock,

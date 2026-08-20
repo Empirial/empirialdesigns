@@ -18,7 +18,13 @@ export type CoverflowProject = {
 // re-render per tick. Card width is fluid (see .coverflow-card in the
 // style block below) rather than a fixed px constant, so "step" and
 // "active card" are measured off the actual rendered card each time.
-export default function PortfolioCoverflow({ projects }: { projects: CoverflowProject[] }) {
+export default function PortfolioCoverflow({
+  projects,
+  layout = 'landscape',
+}: {
+  projects: CoverflowProject[];
+  layout?: 'landscape' | 'poster';
+}) {
   const trackRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -109,6 +115,7 @@ export default function PortfolioCoverflow({ projects }: { projects: CoverflowPr
           <CoverflowCard
             key={project.title}
             project={project}
+            layout={layout}
             innerRef={(el) => { cardRefs.current[i] = el; }}
           />
         ))}
@@ -152,7 +159,8 @@ export default function PortfolioCoverflow({ projects }: { projects: CoverflowPr
           gallery reads as one long sliding strip rather than a stack of
           small tiles. */}
       <style>{`
-        .coverflow-card { width: clamp(280px, 72vw, 860px); height: clamp(240px, 30vw, 360px); }
+        .coverflow-card-landscape { width: clamp(280px, 72vw, 860px); height: clamp(240px, 30vw, 360px); }
+        .coverflow-card-poster { width: clamp(245px, 38vw, 430px); height: clamp(370px, 56vw, 650px); }
       `}</style>
     </div>
   );
@@ -160,7 +168,7 @@ export default function PortfolioCoverflow({ projects }: { projects: CoverflowPr
 
 const GAP_PX = 20;
 
-const CoverflowCard = ({ project, innerRef }: { project: CoverflowProject; innerRef: (el: HTMLDivElement | null) => void }) => {
+const CoverflowCard = ({ project, layout, innerRef }: { project: CoverflowProject; layout: 'landscape' | 'poster'; innerRef: (el: HTMLDivElement | null) => void }) => {
   // Cast: which of the two tags (`a`/`div`) we're rendering is only known
   // at runtime, and they don't share a props type to spread against.
   const Wrapper = (project.url ? 'a' : 'div') as any;
@@ -182,13 +190,13 @@ const CoverflowCard = ({ project, innerRef }: { project: CoverflowProject; inner
   return (
     <div
       ref={innerRef}
-      className="coverflow-card group relative shrink-0 snap-center overflow-hidden rounded-[28px] border border-white/10 bg-white/[.03] shadow-[0_20px_60px_rgba(0,0,0,.4)] transition-transform duration-300 ease-out"
+      className={`coverflow-card-${layout} group relative shrink-0 snap-center overflow-hidden rounded-[28px] border border-white/10 bg-white/[.03] shadow-[0_20px_60px_rgba(0,0,0,.4)] transition-transform duration-300 ease-out`}
     >
       <Wrapper {...wrapperProps} className="absolute inset-0 block">
         <img
           src={cardImage}
           alt={`${project.title} project`}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          className={`h-full w-full transition duration-500 group-hover:scale-105 ${layout === 'poster' ? 'object-contain' : 'object-cover'}`}
           onError={() => setPreviewImageFailed(true)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />

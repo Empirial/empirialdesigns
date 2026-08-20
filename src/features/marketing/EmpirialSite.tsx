@@ -29,6 +29,16 @@ import empirialAttorneysHero from '@/assets/portfolio/empirial-attorneys-hero.jp
 import missEmpirialSaHero from '@/assets/portfolio/miss-empirial-sa-hero.jpg';
 import siyaleleProjectsHero from '@/assets/portfolio/siyalele-projects-hero.jpg';
 import pitchlyHero from '@/assets/portfolio/pitchly-hero.jpg';
+import breakfastHamperPoster from '@/assets/portfolio-archive/Breakfast Hamper BW.png';
+import genesisNailsPoster from '@/assets/portfolio-archive/Genesis & Her Nails (2).png';
+import gudaniDrivingPoster from '@/assets/portfolio-archive/Gudani Driving School.png';
+import menuPoster from '@/assets/portfolio-archive/Our Menu (3).pdf.png';
+import websiteDesignPoster from '@/assets/portfolio-archive/Website Design Poster.png';
+import posterOne from '@/assets/portfolio-archive/1.jpg';
+import posterTwo from '@/assets/portfolio-archive/2.jpg';
+import posterThree from '@/assets/portfolio-archive/3.jpg';
+import posterFour from '@/assets/portfolio-archive/4.jpg';
+import posterFive from '@/assets/portfolio-archive/5.jpg';
 import BrandIcon from '@/components/BrandIcon';
 import PortfolioCoverflow from '@/features/marketing/components/PortfolioCoverflow';
 
@@ -220,7 +230,37 @@ const projects = [
   { title: 'Siyalele Projects', category: 'Websites', type: 'Business website · Project showcase', image: siyaleleProjectsHero, url: 'https://siyaleleprojects.netlify.app' },
   { title: 'Pitchly', category: 'AI & Automation', type: 'AI product · Firebase app', image: pitchlyHero, url: 'https://pitchly-5e336.web.app' },
 ];
-export const PortfolioPage = () => { const [filter, setFilter] = useState('All'); const filters = ['All', 'Websites', 'Apps', 'AI & Automation', 'Branding', 'E-commerce']; const visibleProjects = filter === 'All' ? projects : projects.filter((project) => project.category === filter); return <Page><section className="px-6 pb-10 pt-36 text-center"><div className="mx-auto max-w-2xl"><h1 className="text-5xl font-semibold tracking-tight sm:text-7xl">Portfolio</h1><p className="mt-5 text-lg leading-8 text-white/55">Explore work built by <span className={purple}>EMPIRIAL</span> across industries.</p></div><div className="mx-auto mt-8 flex max-w-fit flex-wrap justify-center gap-1.5 rounded-full border border-white/10 bg-white/[.025] p-1.5" aria-label="Filter portfolio projects">{filters.map((item) => <button key={item} onClick={() => setFilter(item)} className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${filter === item ? 'bg-[#8138ff] text-white shadow-[0_0_20px_rgba(129,56,255,.25)]' : 'text-white/50 hover:bg-white/10 hover:text-white'}`}>{item}</button>)}</div></section><section className="pb-24 pt-8"><PortfolioCoverflow projects={visibleProjects} /></section></Page>; };
+
+const posterDesigns = [
+  { title: 'Breakfast Hamper', category: 'Poster Design', type: 'Campaign poster · Food & hospitality', image: breakfastHamperPoster },
+  { title: 'Genesis & Her Nails', category: 'Poster Design', type: 'Promotional poster · Beauty', image: genesisNailsPoster },
+  { title: 'Gudani Driving School', category: 'Poster Design', type: 'Promotional poster · Education', image: gudaniDrivingPoster },
+  { title: 'Our Menu', category: 'Poster Design', type: 'Menu design · Food & hospitality', image: menuPoster },
+  { title: 'Website Design', category: 'Poster Design', type: 'Campaign poster · Digital services', image: websiteDesignPoster },
+  { title: 'Campaign One', category: 'Poster Design', type: 'Social campaign · Visual design', image: posterOne },
+  { title: 'Campaign Two', category: 'Poster Design', type: 'Social campaign · Visual design', image: posterTwo },
+  { title: 'Campaign Three', category: 'Poster Design', type: 'Social campaign · Visual design', image: posterThree },
+  { title: 'Campaign Four', category: 'Poster Design', type: 'Social campaign · Visual design', image: posterFour },
+  { title: 'Campaign Five', category: 'Poster Design', type: 'Social campaign · Visual design', image: posterFive },
+];
+
+export const PortfolioPage = () => {
+  const [filter, setFilter] = useState('All');
+  const filters = ['All', 'Websites', 'Apps', 'AI & Automation', 'Branding', 'E-commerce'];
+  const visibleProjects = filter === 'All' ? projects : projects.filter((project) => project.category === filter);
+
+  return <Page>
+    <section className="px-6 pb-10 pt-36 text-center">
+      <div className="mx-auto max-w-2xl"><h1 className="text-5xl font-semibold tracking-tight sm:text-7xl">Portfolio</h1><p className="mt-5 text-lg leading-8 text-white/55">Explore work built by <span className={purple}>EMPIRIAL</span> across industries.</p></div>
+      <div className="mx-auto mt-8 flex max-w-fit flex-wrap justify-center gap-1.5 rounded-full border border-white/10 bg-white/[.025] p-1.5" aria-label="Filter portfolio projects">{filters.map((item) => <button key={item} onClick={() => setFilter(item)} className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${filter === item ? 'bg-[#8138ff] text-white shadow-[0_0_20px_rgba(129,56,255,.25)]' : 'text-white/50 hover:bg-white/10 hover:text-white'}`}>{item}</button>)}</div>
+    </section>
+    <section className="pb-24 pt-8"><PortfolioCoverflow projects={visibleProjects} /></section>
+    <section className="border-t border-white/10 bg-white/[.015] py-24">
+      <div className="mx-auto mb-10 max-w-7xl px-6"><Eyebrow>Poster design</Eyebrow><div className="max-w-2xl"><h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">Campaigns made to <span className={purple}>stand out.</span></h2><p className="mt-4 text-lg leading-8 text-white/55">A selection of promotional posters, menu layouts and social campaigns designed for real businesses.</p></div></div>
+      <PortfolioCoverflow projects={posterDesigns} layout="poster" />
+    </section>
+  </Page>;
+};
 
 export const AboutPage = () => <Page><section className="px-6 pb-24 pt-36"><div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.1fr_.9fr]"><div><Eyebrow>About EMPIRIAL</Eyebrow><h1 className="text-5xl font-semibold tracking-tight sm:text-7xl">Building intelligent digital <span className={purple}>businesses.</span></h1><p className="mt-7 max-w-xl text-lg leading-8 text-white/55">EMPIRIAL exists to help ambitious people turn good ideas into clear, credible, useful digital experiences.</p></div><img src={humanRobot} alt="Human and EMPIRIAL robot collaborating" className="aspect-[4/3] w-full max-w-xl rounded-2xl object-cover" /></div></section><section className="mx-auto grid max-w-7xl gap-12 border-t border-white/10 px-6 py-24 lg:grid-cols-2"><div><Eyebrow>Your story, made digital</Eyebrow><h2 className="text-4xl font-semibold">The best work sits where <span className={purple}>human thinking</span> meets useful technology.</h2></div><div className="space-y-5 text-white/55"><p className="leading-8">We started EMPIRIAL because too many businesses are forced to choose between beautiful design and technology that works. We believe the best digital products need both.</p><p className="leading-8">Our job is to bring clarity to complex ideas, create experiences people trust, and build systems that help your business keep moving after launch.</p></div></section><section className="mx-auto max-w-7xl px-6 pb-24"><img src={workspace} alt="EMPIRIAL futuristic workspace" className="mb-8 h-72 w-full rounded-2xl object-cover opacity-80" /><div className="grid gap-4 md:grid-cols-4">{[['01','Ideas into reality.'],['02','Human + AI connection.'],['03','Signal of intelligence.'],['04','Forward momentum.']].map(([n,t]) => <div key={n} className="rounded-2xl border border-white/10 p-6"><p className="text-sm text-[#b56cff]">{n}</p><p className="mt-14 text-lg font-semibold">{t}</p></div>)}</div></section></Page>;
 

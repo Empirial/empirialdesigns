@@ -5,7 +5,14 @@
 // piece of writing, not several independently-generated page sections that
 // need a wireframe assigned and a manifest tracked — so this stays a single
 // DeepSeek call instead of reusing that whole pipeline's machinery.
-const { callAgent, extractJson } = require('./shared');
+//
+// NOT currently wired to a live Cloud Function — no exports.generateDocument
+// exists in index.js despite the frontend (DocumentWorkspace.tsx,
+// repos.service.ts's generateDocumentFromPrompt) and docs/AI_BUILDER_ENGINE.md
+// describing "Document mode" as shipped. Left in place, unmoved by the
+// agents/ layer reorg, since it's not part of the live website pipeline.
+const { callAgent } = require('./01-model/provider');
+const { extractJson } = require('./shared');
 
 const SYSTEM_PROMPT = `You are a professional document writer. Given a request, produce a well-structured document as JSON.
 
