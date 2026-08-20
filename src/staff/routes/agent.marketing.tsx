@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Copy, Download, ImageIcon, MessageCircleMore } from "lucide-react";
+import { Copy, Download, MessageCircleMore } from "lucide-react";
 import { AppShell } from "@staff/components/layout/app-shell";
 import { PageHeader } from "@staff/components/shared/page-header";
 import { SectionCard } from "@staff/components/shared/section-card";
@@ -9,6 +9,8 @@ import { Button } from "@staff/components/ui/button";
 import { Card } from "@staff/components/ui/card";
 import { useServices } from "@staff/lib/services-data";
 import empirialIcon from "@/assets/Brand ID/empirial-icon.png";
+import businessWebsitePoster from "@/../marketing-assets/Pricing-posters/ChatGPT Image Aug 16, 2026, 11_44_32 PM.png";
+import customSoftwarePoster from "@/../marketing-assets/Pricing-posters/ChatGPT Image Aug 18, 2026, 12_24_02 PM.png";
 
 export const Route = createFileRoute("/agent/marketing")({
   head: () => ({
@@ -26,6 +28,11 @@ export const Route = createFileRoute("/agent/marketing")({
 // no Firebase Storage upload, no ongoing storage cost. Downloading it is
 // just a plain <a download>, no server round-trip.
 const BRAND_ASSETS = [{ name: "EMPIRIAL Icon", description: "Square brand mark — profile photos, WhatsApp icon, favicon.", src: empirialIcon, filename: "empirial-icon.png" }];
+
+const POSTERS = [
+  { name: "Business Website", description: "Business website package — from R2 500.", src: businessWebsitePoster, filename: "empirial-business-website-poster.png", caption: "Get your business online, found and growing with a professional website from R2 500 — no monthly fees, you own it. 🚀" },
+  { name: "Custom Software Development", description: "Custom software package — from R15 000.", src: customSoftwarePoster, filename: "empirial-custom-software-poster.png", caption: "Stop forcing your business into generic tools — get custom software built around your workflow from R15 000. 🚀" },
+];
 
 function PageAgentMarketing() {
   const { data: services = [] } = useServices();
@@ -86,12 +93,24 @@ function PageAgentMarketing() {
           )}
         </SectionCard>
 
-        <SectionCard title="Posters & social graphics" description="Coming soon">
-          <EmptyState
-            icon={ImageIcon}
-            title="No posters uploaded yet"
-            description="Once EmpirialDesigns' own posters, flyers and social media graphics are ready, they'll show up here for you to download and share."
-          />
+        <SectionCard title="Posters & social graphics" description="Approved graphics and copy-ready captions for sharing">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {POSTERS.map((poster) => (
+              <Card key={poster.filename} className="gap-3 overflow-hidden p-0">
+                <div className="flex max-h-[430px] items-center justify-center bg-muted/30 p-3">
+                  <img src={poster.src} alt={`${poster.name} promotional poster`} className="max-h-[400px] w-full rounded-md object-contain" />
+                </div>
+                <div className="space-y-3 p-4 pt-0">
+                  <div><p className="text-sm font-semibold">{poster.name}</p><p className="mt-0.5 text-xs text-muted-foreground">{poster.description}</p></div>
+                  <p className="rounded-lg border border-border bg-muted/30 p-2.5 text-xs leading-relaxed text-muted-foreground">{poster.caption}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => copyPitch(`${poster.name} caption`, poster.caption)}><Copy className="mr-1.5 size-3.5" /> Copy caption</Button>
+                    <Button size="sm" variant="outline" asChild><a href={poster.src} download={poster.filename}><Download className="mr-1.5 size-3.5" /> Download</a></Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         </SectionCard>
       </div>
     </AppShell>
