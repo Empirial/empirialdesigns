@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, Timestamp } from "firebase/firestore";
 import { toast } from "sonner";
@@ -41,7 +41,7 @@ import { useAgents } from "@staff/lib/agents-data";
 import { useDeals } from "@staff/lib/deals-data";
 import { useServices } from "@staff/lib/services-data";
 import { formatDate, formatZAR, percent } from "@staff/lib/format";
-import { LEAD_STATUSES } from "@staff/lib/types";
+import { LEAD_STATUSES, type Lead } from "@staff/lib/types";
 import {
   CalendarDays,
   Download,
@@ -277,6 +277,20 @@ function PageAdminReports() {
       .sort((a, b) => b.revenue - a.revenue);
   }, [agents, deals, callLogs]);
 
+  const agentNameById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents]);
+  const interestedLeads = useMemo(
+    () => leads.filter((lead) => lead.status === "Interested").toSorted((a, b) =>
+      new Date(b.lastContact ?? b.createdAt).getTime() - new Date(a.lastContact ?? a.createdAt).getTime(),
+    ),
+    [leads],
+  );
+  const followUpLeads = useMemo(
+    () => leads.filter((lead) => lead.status === "Follow-up").toSorted((a, b) =>
+      new Date(a.nextFollowUp ?? a.createdAt).getTime() - new Date(b.nextFollowUp ?? b.createdAt).getTime(),
+    ),
+    [leads],
+  );
+
   const exportReport = () => toast.success("Report exported (mock) — check your downloads.");
 
   if (leadsLoading || agentsLoading || dealsLoading || servicesLoading || callLogsLoading) {
@@ -358,6 +372,7 @@ function PageAdminReports() {
             <TabsTrigger value="conversion">Conversion</TabsTrigger>
             <TabsTrigger value="revenue">Revenue</TabsTrigger>
             <TabsTrigger value="teams">Teams</TabsTrigger>
+            <TabsTrigger value="lead-lists">Lead Lists</TabsTrigger>
           </TabsList>
           </div>
 
@@ -574,8 +589,78 @@ function PageAdminReports() {
               </Table>
             </SectionCard>
           </TabsContent>
+
+          <TabsContent value="lead-lists" className="mt-5 space-y-6">
+            <LeadListTable
+              title="Interested leads"
+              description="Every lead currently marked as interested, ordered by most recent contact."
+              leads={interestedLeads}
+              agentNameById={agentNameById}
+              dateColumn="Last contact"
+            />
+            <LeadListTable
+              title="Follow-up leads"
+              description="Every lead waiting for a follow-up, ordered by the next follow-up date."
+              leads={followUpLeads}
+              agentNameById={agentNameById}
+              dateColumn="Next follow-up"
+              followUpDates
+            />
+          </TabsContent>
         </Tabs>
       </div>
     </AppShell>
+  );
+}
+
+function LeadListTable({
+  title,
+  description,
+  leads,
+  agentNameById,
+  dateColumn,
+  followUpDates = false,
+}: {
+  title: string;
+  description: string;
+  leads: Lead[];
+  agentNameById: Map<string, string>;
+  dateColumn: string;
+  followUpDates?: boolean;
+}) {
+  return (
+    <SectionCard title={title} description={`${description} ${leads.length} total.`} noPadding>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Business / contact</TableHead>
+              <TableHead>Assigned agent</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Industry</TableHead>
+              <TableHead>{dateColumn}</TableHead>
+              <TableHead className="text-right">Value</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {leads.length === 0 ? (
+              <TableRow><TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">No leads in this list.</TableCell></TableRow>
+            ) : leads.map((lead) => (
+              <TableRow key={lead.id}>
+                <TableCell>
+                  <Link to="/admin/leads" search={{ leadId: lead.id }} className="font-medium hover:underline">{lead.business}</Link>
+                  <p className="text-xs text-muted-foreground">{lead.contactPerson || "No contact listed"}</p>
+                </TableCell>
+                <TableCell className="text-sm">{lead.assignedAgentId ? agentNameById.get(lead.assignedAgentId) ?? "Unknown agent" : "Unassigned"}</TableCell>
+                <TableCell className="text-sm">{lead.phone || "—"}</TableCell>
+                <TableCell className="text-sm">{lead.industry || "—"}</TableCell>
+                <TableCell className="text-sm">{formatDate((followUpDates ? lead.nextFollowUp : lead.lastContact) ?? lead.createdAt)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatZAR(lead.value)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </SectionCard>
   );
 }
