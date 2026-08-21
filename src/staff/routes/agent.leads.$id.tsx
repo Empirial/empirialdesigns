@@ -11,6 +11,7 @@ import {
   Lock,
   Mail,
   MapPin,
+  MessageCircle,
   Phone,
   PhoneCall,
   PhoneOff,
@@ -62,6 +63,7 @@ import { callLogCall } from "@staff/lib/functions";
 import { firebaseAuth } from "@staff/lib/auth";
 import type { LeadStatus } from "@staff/lib/types";
 import { formatDate, formatDateTime, formatTime, formatZAR, isOverdue } from "@staff/lib/format";
+import { toWhatsAppLink } from "@staff/lib/phone";
 import { cn } from "@staff/lib/utils";
 
 export const Route = createFileRoute("/agent/leads/$id")({
@@ -282,11 +284,22 @@ function PageAgentLeadsId() {
             </div>
             <Separator className="my-3" />
             <FieldRow label="Contact person" value={`${lead.contactPerson} — ${lead.role}`} />
-            <a href={`tel:${lead.phone}`} className="block">
-              <Button className="mt-1 w-full" size="lg">
-                <Phone className="mr-2 size-4" /> {lead.phone}
-              </Button>
-            </a>
+            <div className="mt-1 flex flex-col gap-1.5">
+              <a href={`tel:${lead.phone}`} className="block">
+                <Button className="w-full" size="lg">
+                  <Phone className="mr-2 size-4" /> {lead.phone}
+                </Button>
+              </a>
+              <a href={toWhatsAppLink(lead.phone)} target="_blank" rel="noreferrer" className="block">
+                <Button
+                  variant="outline"
+                  className="w-full border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                  size="lg"
+                >
+                  <MessageCircle className="mr-2 size-4" /> WhatsApp
+                </Button>
+              </a>
+            </div>
             <div className="mt-3 space-y-1 text-sm">
               <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-primary hover:underline">
                 <Mail className="size-3.5" /> {lead.email}

@@ -274,6 +274,16 @@ service cloud.firestore {
       allow write: if isStaffAdmin();
     }
 
+    // Admin-uploaded marketing materials (posters, brand assets, portfolio
+    // screenshots) layered on top of the bundled defaults on
+    // agent.marketing.tsx. Every signed-in staff user reads; only admins
+    // upload/delete. Storage object lives at marketingMaterials/{uuid}-{name}
+    // — see storage.rules.
+    match /marketingMaterials/{materialId} {
+      allow get, list: if isSignedIn();
+      allow create, delete: if isStaffAdmin();
+    }
+
     // Written only by Cloud Functions (writeAuditLog(), used by every
     // mutating callable above).
     match /auditLog/{entryId} {

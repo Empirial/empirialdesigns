@@ -17,6 +17,7 @@ import { Route as AdminCommissionsRouteImport } from './routes/admin.commissions
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminImportRouteImport } from './routes/admin.import'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
+import { Route as AdminMarketingRouteImport } from './routes/admin.marketing'
 import { Route as AdminMessagesRouteImport } from './routes/admin.messages'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
@@ -24,6 +25,7 @@ import { Route as AdminScriptsRouteImport } from './routes/admin.scripts'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AgentAssistantRouteImport } from './routes/agent.assistant'
+import { Route as AgentCompanyProfileRouteImport } from './routes/agent.company-profile'
 import { Route as AgentDashboardRouteImport } from './routes/agent.dashboard'
 import { Route as AgentFollowUpsRouteImport } from './routes/agent.follow-ups'
 import { Route as AgentMarketingRouteImport } from './routes/agent.marketing'
@@ -80,6 +82,11 @@ const AdminLeadsRoute = AdminLeadsRouteImport.update({
   path: '/leads',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminMarketingRoute = AdminMarketingRouteImport.update({
+  id: '/marketing',
+  path: '/marketing',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminMessagesRoute = AdminMessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
@@ -113,6 +120,11 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
 const AgentAssistantRoute = AgentAssistantRouteImport.update({
   id: '/assistant',
   path: '/assistant',
+  getParentRoute: () => AgentRoute,
+} as any)
+const AgentCompanyProfileRoute = AgentCompanyProfileRouteImport.update({
+  id: '/company-profile',
+  path: '/company-profile',
   getParentRoute: () => AgentRoute,
 } as any)
 const AgentDashboardRoute = AgentDashboardRouteImport.update({
@@ -200,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/import': typeof AdminImportRoute
   '/admin/leads': typeof AdminLeadsRoute
+  '/admin/marketing': typeof AdminMarketingRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -207,6 +220,7 @@ export interface FileRoutesByFullPath {
   '/admin/services': typeof AdminServicesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/agent/assistant': typeof AgentAssistantRoute
+  '/agent/company-profile': typeof AgentCompanyProfileRoute
   '/agent/dashboard': typeof AgentDashboardRoute
   '/agent/follow-ups': typeof AgentFollowUpsRoute
   '/agent/marketing': typeof AgentMarketingRoute
@@ -232,6 +246,7 @@ export interface FileRoutesByTo {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/import': typeof AdminImportRoute
   '/admin/leads': typeof AdminLeadsRoute
+  '/admin/marketing': typeof AdminMarketingRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -239,6 +254,7 @@ export interface FileRoutesByTo {
   '/admin/services': typeof AdminServicesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/agent/assistant': typeof AgentAssistantRoute
+  '/agent/company-profile': typeof AgentCompanyProfileRoute
   '/agent/dashboard': typeof AgentDashboardRoute
   '/agent/follow-ups': typeof AgentFollowUpsRoute
   '/agent/marketing': typeof AgentMarketingRoute
@@ -265,6 +281,7 @@ export interface FileRoutesById {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/import': typeof AdminImportRoute
   '/admin/leads': typeof AdminLeadsRoute
+  '/admin/marketing': typeof AdminMarketingRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -272,6 +289,7 @@ export interface FileRoutesById {
   '/admin/services': typeof AdminServicesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/agent/assistant': typeof AgentAssistantRoute
+  '/agent/company-profile': typeof AgentCompanyProfileRoute
   '/agent/dashboard': typeof AgentDashboardRoute
   '/agent/follow-ups': typeof AgentFollowUpsRoute
   '/agent/marketing': typeof AgentMarketingRoute
@@ -299,6 +317,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/import'
     | '/admin/leads'
+    | '/admin/marketing'
     | '/admin/messages'
     | '/admin/pipeline'
     | '/admin/reports'
@@ -306,6 +325,7 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/settings'
     | '/agent/assistant'
+    | '/agent/company-profile'
     | '/agent/dashboard'
     | '/agent/follow-ups'
     | '/agent/marketing'
@@ -331,6 +351,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/import'
     | '/admin/leads'
+    | '/admin/marketing'
     | '/admin/messages'
     | '/admin/pipeline'
     | '/admin/reports'
@@ -338,6 +359,7 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/settings'
     | '/agent/assistant'
+    | '/agent/company-profile'
     | '/agent/dashboard'
     | '/agent/follow-ups'
     | '/agent/marketing'
@@ -363,6 +385,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/import'
     | '/admin/leads'
+    | '/admin/marketing'
     | '/admin/messages'
     | '/admin/pipeline'
     | '/admin/reports'
@@ -370,6 +393,7 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/settings'
     | '/agent/assistant'
+    | '/agent/company-profile'
     | '/agent/dashboard'
     | '/agent/follow-ups'
     | '/agent/marketing'
@@ -452,6 +476,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLeadsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/marketing': {
+      id: '/admin/marketing'
+      path: '/marketing'
+      fullPath: '/admin/marketing'
+      preLoaderRoute: typeof AdminMarketingRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/messages': {
       id: '/admin/messages'
       path: '/messages'
@@ -499,6 +530,13 @@ declare module '@tanstack/react-router' {
       path: '/assistant'
       fullPath: '/agent/assistant'
       preLoaderRoute: typeof AgentAssistantRouteImport
+      parentRoute: typeof AgentRoute
+    }
+    '/agent/company-profile': {
+      id: '/agent/company-profile'
+      path: '/company-profile'
+      fullPath: '/agent/company-profile'
+      preLoaderRoute: typeof AgentCompanyProfileRouteImport
       parentRoute: typeof AgentRoute
     }
     '/agent/dashboard': {
@@ -614,6 +652,7 @@ interface AdminRouteChildren {
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminImportRoute: typeof AdminImportRoute
   AdminLeadsRoute: typeof AdminLeadsRoute
+  AdminMarketingRoute: typeof AdminMarketingRoute
   AdminMessagesRoute: typeof AdminMessagesRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
   AdminReportsRoute: typeof AdminReportsRoute
@@ -629,6 +668,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDashboardRoute: AdminDashboardRoute,
   AdminImportRoute: AdminImportRoute,
   AdminLeadsRoute: AdminLeadsRoute,
+  AdminMarketingRoute: AdminMarketingRoute,
   AdminMessagesRoute: AdminMessagesRoute,
   AdminPipelineRoute: AdminPipelineRoute,
   AdminReportsRoute: AdminReportsRoute,
@@ -643,6 +683,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface AgentRouteChildren {
   AgentAssistantRoute: typeof AgentAssistantRoute
+  AgentCompanyProfileRoute: typeof AgentCompanyProfileRoute
   AgentDashboardRoute: typeof AgentDashboardRoute
   AgentFollowUpsRoute: typeof AgentFollowUpsRoute
   AgentMarketingRoute: typeof AgentMarketingRoute
@@ -660,6 +701,7 @@ interface AgentRouteChildren {
 
 const AgentRouteChildren: AgentRouteChildren = {
   AgentAssistantRoute: AgentAssistantRoute,
+  AgentCompanyProfileRoute: AgentCompanyProfileRoute,
   AgentDashboardRoute: AgentDashboardRoute,
   AgentFollowUpsRoute: AgentFollowUpsRoute,
   AgentMarketingRoute: AgentMarketingRoute,

@@ -58,6 +58,7 @@ const ADMIN_NAV: NavItem[] = [
   { title: "Messages", to: "/admin/messages", icon: MessageSquare },
   { title: "Pipeline", to: "/admin/pipeline", icon: KanbanSquare },
   { title: "Services", to: "/admin/services", icon: Package },
+  { title: "Marketing Materials", to: "/admin/marketing", icon: Megaphone },
   { title: "Scripts", to: "/admin/scripts", icon: FileText },
   { title: "Commissions", to: "/admin/commissions", icon: Receipt },
   { title: "Reports", to: "/admin/reports", icon: BarChart3 },

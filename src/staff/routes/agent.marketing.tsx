@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Copy, Download, ExternalLink, MessageCircleMore } from "lucide-react";
+import { Copy, Download, ExternalLink, FileText, MessageCircleMore } from "lucide-react";
 import { AppShell } from "@staff/components/layout/app-shell";
 import { PageHeader } from "@staff/components/shared/page-header";
 import { SectionCard } from "@staff/components/shared/section-card";
@@ -8,6 +8,8 @@ import { EmptyState } from "@staff/components/shared/empty-state";
 import { Button } from "@staff/components/ui/button";
 import { Card } from "@staff/components/ui/card";
 import { useServices } from "@staff/lib/services-data";
+import { COMPANY_PROFILE } from "@staff/lib/company-profile-data";
+import { useMarketingMaterials } from "@staff/lib/marketing-materials-data";
 import empirialIcon from "@/assets/Brand ID/empirial-icon.png";
 import businessWebsitePoster from "@/../marketing-assets/Pricing-posters/ChatGPT Image Aug 16, 2026, 11_44_32 PM.png";
 import customSoftwarePoster from "@/../marketing-assets/Pricing-posters/ChatGPT Image Aug 18, 2026, 12_24_02 PM.png";
@@ -94,6 +96,10 @@ const PORTFOLIO_SCREENSHOTS = [
 
 function PageAgentMarketing() {
   const { data: services = [] } = useServices();
+  const { data: materials = [] } = useMarketingMaterials();
+  const uploadedBrandAssets = materials.filter((m) => m.type === "brand");
+  const uploadedPosters = materials.filter((m) => m.type === "poster");
+  const uploadedPortfolio = materials.filter((m) => m.type === "portfolio");
 
   const copyPitch = (name: string, pitch: string) => {
     navigator.clipboard?.writeText(pitch);
@@ -109,6 +115,25 @@ function PageAgentMarketing() {
       />
 
       <div className="mt-6 space-y-6">
+        <SectionCard title="Company profile" description="A single leave-behind about EMPIRIAL as a whole — about us, services, why us, and how to reach us">
+          <Card className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/30">
+                <FileText className="size-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">{COMPANY_PROFILE.tagline}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">About us, services, why us, our process and contact details — one page, ready to send or print.</p>
+              </div>
+            </div>
+            <Button size="sm" asChild className="w-fit shrink-0">
+              <Link to="/agent/company-profile">
+                <Download className="mr-1.5 size-3.5" /> View & download
+              </Link>
+            </Button>
+          </Card>
+        </SectionCard>
+
         <SectionCard title="Brand assets" description="Official EMPIRIAL logo files — free to use for anything client-facing">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {BRAND_ASSETS.map((asset) => (
@@ -122,6 +147,22 @@ function PageAgentMarketing() {
                 </div>
                 <Button size="sm" variant="outline" asChild>
                   <a href={asset.src} download={asset.filename}>
+                    <Download className="mr-1.5 size-3.5" /> Download
+                  </a>
+                </Button>
+              </Card>
+            ))}
+            {uploadedBrandAssets.map((asset) => (
+              <Card key={asset.id} className="gap-3 p-4">
+                <div className="flex items-center justify-center rounded-lg border border-border bg-muted/30 p-6">
+                  <img src={asset.imageUrl} alt={asset.name} className="h-16 w-16 object-contain" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{asset.name}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{asset.description}</p>
+                </div>
+                <Button size="sm" variant="outline" asChild>
+                  <a href={asset.imageUrl} download={asset.name}>
                     <Download className="mr-1.5 size-3.5" /> Download
                   </a>
                 </Button>
@@ -168,6 +209,25 @@ function PageAgentMarketing() {
                 </div>
               </Card>
             ))}
+            {uploadedPosters.map((poster) => (
+              <Card key={poster.id} className="gap-3 overflow-hidden p-0">
+                <div className="flex max-h-[430px] items-center justify-center bg-muted/30 p-3">
+                  <img src={poster.imageUrl} alt={`${poster.name} promotional poster`} className="max-h-[400px] w-full rounded-md object-contain" />
+                </div>
+                <div className="space-y-3 p-4 pt-0">
+                  <div><p className="text-sm font-semibold">{poster.name}</p><p className="mt-0.5 text-xs text-muted-foreground">{poster.description}</p></div>
+                  {poster.caption ? (
+                    <p className="rounded-lg border border-border bg-muted/30 p-2.5 text-xs leading-relaxed text-muted-foreground">{poster.caption}</p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    {poster.caption ? (
+                      <Button size="sm" variant="outline" onClick={() => copyPitch(`${poster.name} caption`, poster.caption)}><Copy className="mr-1.5 size-3.5" /> Copy caption</Button>
+                    ) : null}
+                    <Button size="sm" variant="outline" asChild><a href={poster.imageUrl} download={poster.name}><Download className="mr-1.5 size-3.5" /> Download</a></Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
           </div>
         </SectionCard>
 
@@ -183,6 +243,22 @@ function PageAgentMarketing() {
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" asChild><a href={shot.src} download={shot.filename}><Download className="mr-1.5 size-3.5" /> Download</a></Button>
                     <Button size="sm" variant="outline" asChild><a href={shot.url} target="_blank" rel="noreferrer"><ExternalLink className="mr-1.5 size-3.5" /> Visit site</a></Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+            {uploadedPortfolio.map((shot) => (
+              <Card key={shot.id} className="gap-3 overflow-hidden p-0">
+                <a href={shot.imageUrl} target="_blank" rel="noreferrer" className="block max-h-[260px] overflow-hidden bg-muted/30">
+                  <img src={shot.imageUrl} alt={`${shot.name} full-page screenshot`} className="w-full object-cover object-top" />
+                </a>
+                <div className="space-y-3 p-4 pt-0">
+                  <p className="text-sm font-semibold">{shot.name}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" asChild><a href={shot.imageUrl} download={shot.name}><Download className="mr-1.5 size-3.5" /> Download</a></Button>
+                    {shot.url ? (
+                      <Button size="sm" variant="outline" asChild><a href={shot.url} target="_blank" rel="noreferrer"><ExternalLink className="mr-1.5 size-3.5" /> Visit site</a></Button>
+                    ) : null}
                   </div>
                 </div>
               </Card>
