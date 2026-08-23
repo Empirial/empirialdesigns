@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
-import { ChevronDown, History, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronDown, History, Loader2, PanelLeftClose, PanelLeftOpen, Volume2 } from 'lucide-react';
 import { useSandpack, useSandpackNavigation } from '@codesandbox/sandpack-react';
 import EmpirialIcon from '@/assets/Brand ID/empirial-icon.png';
 import { auth } from '@/lib/firebase';
-import { appendChatMessages, saveRepoFiles, type ChatMessage } from '@/features/repositories/lib/repos.service';
+import { appendChatMessages, saveRepoFiles, synthesizeSpeech, type ChatMessage } from '@/features/repositories/lib/repos.service';
 import { parseAiFileBlocks, streamAiChat, stripFileBlocksForDisplay, type ChatTurn } from '../lib/aiChat';
 import ProjectMenu from './ProjectMenu';
 import PromptComposer from './PromptComposer';
@@ -36,6 +36,56 @@ export default function AssistantPanel({
   // Firestore `seq` continues from wherever the loaded history left off, so a
   // reload never collides with or overwrites previously saved messages.
   const nextSeqRef = useRef((initialHistory || []).length);
+  // Index of the assistant bubble currently being synthesized/played, or
+  // null — drives the speaker icon's loading spinner and lets speak() bail
+  // out of a stale response if the user clicked a different bubble (or the
+  // same one again) before the first request finished.
+  // speakingIndex covers both "fetching audio" and "currently playing" (used
+  // for the stop-on-second-click / aria-pressed behavior); loadingIndex
+  // narrows that to just the fetch, so the icon can show a spinner only
+  // while waiting on the network and switch to a plain speaker glyph once
+  // playback actually starts.
+  const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
+  const [loadingIndex, setLoadingIndex] = useState<number | null>(null);
+  const speakingAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const speak = async (index: number, text: string) => {
+    if (!repoId || !text.trim()) return;
+    // Clicking the icon again on the currently-playing/loading bubble stops
+    // it instead of starting a second, overlapping playback.
+    if (speakingIndex === index) {
+      speakingAudioRef.current?.pause();
+      speakingAudioRef.current = null;
+      setSpeakingIndex(null);
+      setLoadingIndex(null);
+      return;
+    }
+    speakingAudioRef.current?.pause();
+    setSpeakingIndex(index);
+    setLoadingIndex(index);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('You need to be signed in to use text-to-speech.');
+      const idToken = await user.getIdToken();
+      const url = await synthesizeSpeech(repoId, idToken, text);
+      const audioEl = new Audio(url);
+      speakingAudioRef.current = audioEl;
+      const stop = () => {
+        URL.revokeObjectURL(url);
+        setSpeakingIndex((prev) => (prev === index ? null : prev));
+        setLoadingIndex((prev) => (prev === index ? null : prev));
+      };
+      audioEl.onended = stop;
+      audioEl.onerror = stop;
+      await audioEl.play();
+      setLoadingIndex((prev) => (prev === index ? null : prev));
+    } catch (error) {
+      console.error('Text-to-speech failed:', error);
+      showNotice(error instanceof Error ? error.message : 'Text-to-speech failed');
+      setSpeakingIndex((prev) => (prev === index ? null : prev));
+      setLoadingIndex((prev) => (prev === index ? null : prev));
+    }
+  };
 
   const startRename = () => { setDraftName(projectName); setProjectMenuOpen(false); setRenaming(true); };
   const commitRename = () => { setRenaming(false); if (draftName.trim() && draftName !== projectName) onRenameCommit(draftName.trim()); };
@@ -176,7 +226,20 @@ export default function AssistantPanel({
         )}
         {messages.map((item, index) => (
           <div key={index} className={index % 2 ? 'assistant-bubble' : 'assistant-user'}>
-            {item || (sending && index === messages.length - 1 ? '…' : '')}
+            <span>{item || (sending && index === messages.length - 1 ? '…' : '')}</span>
+            {/* Read-aloud — assistant bubbles only, and only once there's
+                settled text to speak (not mid-stream, not the placeholder). */}
+            {index % 2 === 1 && item && !(sending && index === messages.length - 1) && (
+              <button
+                type="button"
+                className="assistant-bubble-speak"
+                aria-label={speakingIndex === index ? 'Stop reading aloud' : 'Read this reply aloud'}
+                aria-pressed={speakingIndex === index}
+                onClick={() => speak(index, item)}
+              >
+                {loadingIndex === index ? <Loader2 size={13} className="animate-spin" /> : <Volume2 size={13} />}
+              </button>
+            )}
           </div>
         ))}
       </div>

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AlertTriangle, Check, ExternalLink, Loader2, Monitor, RefreshCw, Smartphone } from 'lucide-react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import { isMockSession, mockUser } from '@/lib/mockAuth';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
@@ -11,6 +12,7 @@ import {
   DEFAULT_FILES,
   generateDocumentFromPrompt,
   getChatHistory,
+  getDeploymentStatus,
   getRepo,
   getRepoFiles,
   hydrateRepoFilesFromGithubIfEmpty,
@@ -31,6 +33,7 @@ import PublishButton from '../components/PublishButton';
 import ThemeButton from '../components/ThemeButton';
 import WorkspaceTabs, { type WorkspaceView } from '../components/WorkspaceTabs';
 import DocumentWorkspace from '../components/DocumentWorkspace';
+import SyncStatusBadge from '../components/SyncStatusBadge';
 
 // repoId is passed in by Platform.tsx when opening an existing project
 // (/dashboard/editor/:repoId, /dashboard/preview/:repoId). When it's absent
@@ -176,6 +179,56 @@ export default function BuilderPage({ repoId: repoIdProp }: { repoId?: string } 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoIdProp]);
 
+  // Refreshes the real Vercel deployment status once per page load, for a
+  // project that's been published at least once (vercel_project_id set).
+  // publishWebsite's own poll window is short (45s) and nothing else ever
+  // called this before, so the header's Publish button could sit showing a
+  // stale BUILDING/no-URL state indefinitely after the user came back to a
+  // project later — even though the deploy actually finished, or someone
+  // redeployed straight from the Vercel dashboard. getDeploymentStatus
+  // (functions/index.js) reads Vercel directly and self-heals Firestore's
+  // cached field the same way; see Growth.tsx's mount effect for the same
+  // fix applied there.
+  useEffect(() => {
+    if (!repoId || !repo?.vercel_project_id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (!idToken) return;
+        const { status, url } = await getDeploymentStatus(repoId, idToken);
+        if (cancelled) return;
+        setRepo((prev) => (prev ? { ...prev, vercel_deployment_status: status, vercel_production_url: url ?? prev.vercel_production_url } : prev));
+      } catch (error) {
+        console.error('Failed to refresh deployment status:', error);
+      }
+    })();
+    return () => { cancelled = true; };
+    // Only re-run when the target project changes — not on every repo update
+    // this effect's own setRepo call would otherwise cause.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoId]);
+
+  // Keeps github_sync_status/pending_edit_count live off the repo doc so
+  // SyncStatusBadge reflects aiChat/saveRepoFiles/scheduledRepoSync writes
+  // as they land, without this component polling or re-fetching the whole
+  // repo itself. Only these two fields are merged in — everything else on
+  // `repo` still comes from the one-shot getRepo load/local updates above.
+  useEffect(() => {
+    if (!repoId) return;
+    const unsubscribe = onSnapshot(doc(db, 'user_repos', repoId), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      setRepo((prev) => (prev ? {
+        ...prev,
+        github_sync_status: data.github_sync_status,
+        pending_edit_count: data.pending_edit_count,
+        last_synced_at: data.last_synced_at,
+      } : prev));
+    });
+    return () => unsubscribe();
+  }, [repoId]);
+
   const handleRenameRepoName = async (name: string) => {
     if (!repoId) return;
     setRepo((prev) => (prev ? { ...prev, repo_name: name } : prev));
@@ -282,6 +335,7 @@ export default function BuilderPage({ repoId: repoIdProp }: { repoId?: string } 
                 <button type="button" className="icon-button" aria-label="Open in new tab" onClick={() => showNotice('Opening in a new tab')}><ExternalLink size={15} /></button>
               </div>
               <div className="flex items-center gap-2">
+                {repo?.repo_url && <SyncStatusBadge status={repo.github_sync_status} pendingCount={repo.pending_edit_count} />}
                 <SaveButton repoId={repoId} showNotice={showNotice} />
                 <ThemeButton repoId={repoId} showNotice={showNotice} />
                 <button type="button" className="secondary-button" onClick={() => navigate(`/dashboard/growth/${repoId}`)}>Growth</button>

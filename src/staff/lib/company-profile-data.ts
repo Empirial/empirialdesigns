@@ -28,7 +28,7 @@ export const COMPANY_PROFILE = {
     { step: "04", title: "Launch & handover", detail: "Go live, plus training so your team can run with it." },
   ],
   location: {
-    city: "Polokwane, South Africa",
+    city: "Makhado (Louis Trichardt), Limpopo, South Africa",
     note: "Working remotely with ambitious businesses locally and globally.",
   },
   contact: {

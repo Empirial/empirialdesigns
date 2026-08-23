@@ -41,6 +41,7 @@ import posterFour from '@/assets/portfolio-archive/4.jpg';
 import posterFive from '@/assets/portfolio-archive/5.jpg';
 import BrandIcon from '@/components/BrandIcon';
 import PortfolioCoverflow from '@/features/marketing/components/PortfolioCoverflow';
+import { useSeo, type ProvinceCopy } from '@/features/marketing/lib/seo';
 
 const purple = 'text-[#a855f7]';
 
@@ -88,7 +89,7 @@ export const SiteFooter = () => <footer className="border-t border-white/10 bg-[
     <div><Logo /><p className="mt-5 max-w-xs text-sm leading-6 text-white/45">Intelligent digital solutions that move ambitious businesses forward.</p></div>
     <div><p className="mb-4 text-xs uppercase tracking-[.2em] text-white/40">Explore</p><div className="grid gap-3 text-sm text-white/65"><Link to="/services">Services</Link><Link to="/portfolio">Portfolio</Link><Link to="/about">About</Link><Link to="/contact">Contact</Link></div></div>
     <div><p className="mb-4 text-xs uppercase tracking-[.2em] text-white/40">Capabilities</p><div className="grid gap-3 text-sm text-white/65"><span>Web & apps</span><span>AI automation</span><span>Brand systems</span><span>Growth</span></div></div>
-    <div><p className="mb-4 text-xs uppercase tracking-[.2em] text-white/40">Start a conversation</p><p className="text-sm text-white/70">hello@empirialdesigns.com</p><p className="mt-2 text-sm text-white/45">Polokwane, South Africa</p><a href="https://wa.me/27651859143" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#b56cff]">WhatsApp us <ArrowRight className="h-4 w-4" /></a></div>
+    <div><p className="mb-4 text-xs uppercase tracking-[.2em] text-white/40">Start a conversation</p><p className="text-sm text-white/70">hello@empirialdesigns.com</p><p className="mt-2 text-sm text-white/45">Makhado (Louis Trichardt), Limpopo</p><a href="https://wa.me/27651859143" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#b56cff]">WhatsApp us <ArrowRight className="h-4 w-4" /></a></div>
   </div>
   <div className="mx-auto mt-12 max-w-7xl border-t border-white/10 pt-6 text-xs text-white/35">© 2026 EMPIRIAL. All rights reserved.</div>
 </footer>;
@@ -273,3 +274,75 @@ const formInputCls = 'w-full rounded-lg border border-white/10 bg-white/[.04] px
 const formLabelCls = 'flex flex-col gap-1.5 text-sm text-white/65';
 
 export const ContactPage = () => { const [sent,setSent] = useState(false); const submit = (e: FormEvent) => { e.preventDefault(); setSent(true); }; return <Page><section className="px-6 pb-24 pt-36"><div className="mx-auto max-w-7xl"><div className="max-w-3xl"><Eyebrow>Start a conversation</Eyebrow><h1 className="text-5xl font-semibold tracking-tight sm:text-7xl">Let's build something <span className={purple}>incredible.</span></h1><p className="mt-7 text-lg leading-8 text-white/55">Tell us what you are working towards and we will help you work out the smartest next step.</p></div><div className="mt-16 grid gap-12 lg:grid-cols-[1fr_.55fr]"><form onSubmit={submit} className="rounded-2xl border border-white/10 bg-white/[.03] p-6 sm:p-8"><div className="grid gap-5 sm:grid-cols-2"><label className={formLabelCls}>Name<input required className={formInputCls} /></label><label className={formLabelCls}>Company<input className={formInputCls} /></label><label className={formLabelCls}>Email<input required type="email" className={formInputCls} /></label><label className={formLabelCls}>Phone<input className={formInputCls} /></label></div><label className={`mt-5 ${formLabelCls}`}>Budget<select className={formInputCls}><option>Let's discuss</option><option>R10k – R25k</option><option>R25k – R50k</option><option>R50k+</option></select></label><label className={`mt-5 ${formLabelCls}`}>Project description<textarea required rows={5} className={`${formInputCls} resize-none`} placeholder="What are you trying to build or improve?" /></label><button className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#8138ff] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#8138ff]/85 active:scale-[0.98]">{sent ? 'Enquiry received' : 'Send enquiry'}{sent ? <Check className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}</button>{sent && <p className="mt-4 text-sm text-[#b56cff]">Thank you — we will be in touch soon.</p>}</form><div className="space-y-8"><div><ShieldCheck className="mb-4 text-[#b56cff]" /><h2 className="text-xl font-semibold">A clear next step</h2><p className="mt-3 text-sm leading-7 text-white/50">We will review your brief, ask the important questions, and recommend a practical way forward.</p></div><div><MessageCircle className="mb-4 text-[#b56cff]" /><h2 className="text-xl font-semibold">Prefer WhatsApp?</h2><p className="mt-3 text-sm leading-7 text-white/50">Reach us directly for a quick conversation about your project.</p><a href="https://wa.me/27651859143" className="mt-4 inline-block text-sm font-semibold text-[#b56cff]">Message EMPIRIAL <ArrowRight className="ml-1 inline h-4 w-4" /></a></div><div><Globe2 className="mb-4 text-[#b56cff]" /><h2 className="text-xl font-semibold">Based in South Africa</h2><p className="mt-3 text-sm leading-7 text-white/50">Working remotely with ambitious businesses locally and globally.</p></div></div></div></div></section></Page>; };
+
+// Province landing pages — one per province instead of per-town, so a page
+// targeting "Limpopo" still surfaces for town-level searches ("web design
+// Polokwane") because the town is named naturally in the body copy. Content
+// lives in lib/seo.ts (PROVINCES) so the meta tags and the on-page copy stay
+// driven by the same source instead of drifting apart.
+export const ProvincePage = ({ copy }: { copy: ProvinceCopy }) => {
+  useSeo({
+    title: copy.metaTitle,
+    description: copy.metaDescription,
+    keywords: copy.metaKeywords,
+    path: `/${copy.slug}`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'ProfessionalService',
+      name: 'EMPIRIAL',
+      url: `https://empirialdesigns.co.za/${copy.slug}`,
+      telephone: '+27651859143',
+      areaServed: copy.province,
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: 'Makhado',
+        addressRegion: 'Limpopo',
+        addressCountry: 'ZA',
+      },
+    },
+  });
+  return (
+    <Page>
+      <section className="px-6 pb-20 pt-36">
+        <div className="mx-auto max-w-7xl">
+          <Eyebrow>{copy.province}</Eyebrow>
+          <h1 className="max-w-4xl text-5xl font-semibold tracking-tight sm:text-7xl">{copy.h1}</h1>
+          <p className="mt-7 max-w-2xl text-lg leading-8 text-white/55">{copy.intro}</p>
+          <p className="mt-5 max-w-2xl text-base leading-7 text-white/45">{copy.reach}</p>
+        </div>
+      </section>
+      <section className="mx-auto max-w-7xl px-6 pb-24">
+        <Eyebrow>What we build</Eyebrow>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {services.map((service) => {
+            const Icon = service.icon;
+            return (
+              <div key={service.title} className="rounded-2xl border border-white/10 bg-white/[.03] p-6">
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-[#7c2cff]/15 text-[#b56cff]">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h2 className="mt-4 font-semibold">{service.title}</h2>
+                <p className="mt-1.5 text-sm leading-6 text-white/45">{service.text}</p>
+              </div>
+            );
+          })}
+        </div>
+        <Link to="/services" className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-[#b56cff] hover:text-[#c98bff]">
+          View our full services <ArrowRight className="h-4 w-4" />
+        </Link>
+      </section>
+      <section className="mx-auto max-w-7xl px-6 pb-24">
+        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-8 sm:p-10">
+          <Eyebrow>Get started</Eyebrow>
+          <h2 className="max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">
+            Ready for a website that gets found in {copy.province}?
+          </h2>
+          <p className="mt-4 max-w-xl text-white/55">Get a free, no-obligation quote — we'll tell you exactly what it takes to get your business showing up online.</p>
+          <Link to="/contact" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#8138ff] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#8138ff]/85 active:scale-[0.98]">
+            Get a free quote <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </section>
+    </Page>
+  );
+};

@@ -9,6 +9,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  increment,
   orderBy,
   query,
   setDoc,
@@ -93,9 +94,28 @@ export interface Repo {
   google_business_location_name?: string;
   custom_domain?: string;
   custom_domain_status?: 'PENDING' | 'MISCONFIGURED' | 'VERIFIED';
+
+  // GitHub sync state (functions/index.js's aiChat/requestRepoSync/
+  // publishWebsite/scheduledRepoSync, and this file's own saveRepoFiles) —
+  // see docs/AI_BUILDER_ENGINE.md's Phase 2. Absent on a repo that predates
+  // these fields; treat that the same as 'clean' (nothing to sync yet).
+  github_sync_status?: 'clean' | 'dirty' | 'error';
+  pending_edit_count?: number;
+  last_edit_at?: string;
+  last_synced_at?: string;
+  last_commit_sha?: string;
 }
 
 export type SandpackFiles = Record<string, { code: string }>;
+
+// getRepoTree stores actual binary assets as raw base64 because that is what
+// Sandpack's asset loader expects. Preserve that fact in Firestore so the
+// server can decode it before creating a GitHub blob; otherwise a later sync
+// would commit the base64 characters as a corrupted image/font/media file.
+const BINARY_ASSET_EXTENSION_RE = /\.(?:avif|bmp|gif|ico|jpe?g|png|svg|webp|woff2?|ttf|otf|eot|mp4|webm|mp3|wav|ogg|pdf|zip)$/i;
+function contentEncodingForPath(path: string): 'base64' | 'utf8' {
+  return BINARY_ASSET_EXTENSION_RE.test(path) ? 'base64' : 'utf8';
+}
 
 // Canonical starting point for a brand-new project's file tree, until the
 // first assistant response replaces it. Sandpack in BuilderPage runs the
@@ -147,6 +167,11 @@ function toRepo(id: string, data: Record<string, unknown>): Repo {
     google_business_location_name: data.google_business_location_name as string | undefined,
     custom_domain: data.custom_domain as string | undefined,
     custom_domain_status: data.custom_domain_status as Repo['custom_domain_status'],
+    github_sync_status: data.github_sync_status as Repo['github_sync_status'],
+    pending_edit_count: data.pending_edit_count as number | undefined,
+    last_edit_at: data.last_edit_at as string | undefined,
+    last_synced_at: data.last_synced_at as string | undefined,
+    last_commit_sha: data.last_commit_sha as string | undefined,
   };
 }
 
@@ -234,9 +259,12 @@ export async function getRepoFiles(repoId: string): Promise<SandpackFiles> {
 
 /**
  * Persist the current Sandpack file tree — one doc per path under
- * `files/{path}`, not a single field. Cloud Functions watch this
- * subcollection (onRepoFileWrite) and batch these writes into a real GitHub
- * commit on their own cadence; nothing in this function talks to GitHub.
+ * `files/{path}`, not a single field. Nothing in this function talks to
+ * GitHub: it just marks the repo `dirty` and stamps `last_edit_at` so
+ * either an explicit Save/Publish (`requestRepoSync`/`publishWebsite`) or
+ * the `scheduledRepoSync` backstop sweep picks the edit up later. There is
+ * no Firestore trigger watching this subcollection — see
+ * docs/AI_BUILDER_ENGINE.md's Phase 2 for why.
  */
 export async function saveRepoFiles(repoId: string, files: SandpackFiles): Promise<void> {
   const nowIso = new Date().toISOString();
@@ -246,9 +274,19 @@ export async function saveRepoFiles(repoId: string, files: SandpackFiles): Promi
   Object.entries(files).forEach(([path, file]) => {
     const relativePath = toRelativePath(path);
     const fileRef = doc(collection(repoRef, 'files'), encodeURIComponent(relativePath));
-    batch.set(fileRef, { path: relativePath, content: file.code, updated_at: nowIso });
+    batch.set(fileRef, {
+      path: relativePath,
+      content: file.code,
+      content_encoding: contentEncodingForPath(relativePath),
+      updated_at: nowIso,
+    });
   });
-  batch.update(repoRef, { last_updated: nowIso });
+  batch.update(repoRef, {
+    last_updated: nowIso,
+    last_edit_at: nowIso,
+    github_sync_status: 'dirty',
+    pending_edit_count: increment(Object.keys(files).length),
+  });
 
   await batch.commit();
 }
@@ -570,6 +608,40 @@ export interface PublishResult {
  */
 export async function publishWebsite(repoId: string, idToken: string): Promise<PublishResult> {
   return callFunction<PublishResult>('publishWebsite', idToken, { repoId });
+}
+
+/**
+ * Text-to-speech for the assistant chat's speaker button — see
+ * functions/index.js's exports.textToSpeech / integrations/openrouter/
+ * textToSpeech.js (fish-audio/s2.1-pro-free:free). Unlike callFunction's
+ * callers, the response body is raw audio bytes, not JSON, so this reads it
+ * as a blob and hands back a URL playable straight from an <audio> element
+ * (or `new Audio(url)`) — remember to URL.revokeObjectURL it once playback
+ * finishes to avoid leaking memory.
+ *
+ * `voice` is a Fish Audio reference_id (https://fish.audio/discovery); omit
+ * it to speak with whatever voice this project last used (saved server-side
+ * on user_repos/{repoId}.tts_voice), or the whole-app default if it's never
+ * picked one. Passing `voice` here also becomes this project's new saved
+ * choice for next time.
+ */
+export async function synthesizeSpeech(
+  repoId: string,
+  idToken: string,
+  text: string,
+  voice?: string,
+): Promise<string> {
+  const response = await fetch(`${FIREBASE_FUNCTION_URL}/textToSpeech`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ repoId, text, voice }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || `textToSpeech failed (${response.status})`);
+  }
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
 }
 
 /** Polls the current Vercel deployment status for a project. */

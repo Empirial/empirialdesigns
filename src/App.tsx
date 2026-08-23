@@ -8,6 +8,9 @@ import Services from "./features/marketing/pages/Services";
 import Portfolio from "./features/marketing/pages/Portfolio";
 import About from "./features/marketing/pages/About";
 import Contact from "./features/marketing/pages/Contact";
+import WebDesignLimpopo from "./features/marketing/pages/WebDesignLimpopo";
+import WebDesignMpumalanga from "./features/marketing/pages/WebDesignMpumalanga";
+import WebDesignGauteng from "./features/marketing/pages/WebDesignGauteng";
 import NotFound from "./pages/NotFound";
 import Auth from "./features/auth/pages/Auth";
 import Platform from "./features/platform/pages/Platform";
@@ -30,6 +33,10 @@ const App = () => (
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
+          {/* Province landing pages — SEO, see src/features/marketing/lib/seo.ts */}
+          <Route path="/web-design-limpopo" element={<WebDesignLimpopo />} />
+          <Route path="/web-design-mpumalanga" element={<WebDesignMpumalanga />} />
+          <Route path="/web-design-gauteng" element={<WebDesignGauteng />} />
           <Route path="/auth" element={<Auth />} />
           {/* Platform reads useLocation() itself to decide between its own
               dashboard shell and BuilderPage for /dashboard/chat,

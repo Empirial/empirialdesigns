@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { ChevronDown, Plus, Send } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { ChevronDown, Mic, MicOff, Plus, Send } from 'lucide-react';
+import { useSpeechToText } from '../lib/useSpeechToText';
 
 export default function PromptComposer({ value, onChange, onSend, disabled }: {
   value: string;
@@ -9,6 +10,22 @@ export default function PromptComposer({ value, onChange, onSend, disabled }: {
 }) {
   const [mode, setMode] = useState<'Build' | 'Ask'>('Build');
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
+
+  // Whatever was already typed before dictation started, so live results
+  // are appended onto it rather than replacing it — recomputed fresh on
+  // every recognition update (see useSpeechToText's own comment) rather
+  // than tracked as an incremental diff.
+  const dictationBaseRef = useRef('');
+  const { supported: micSupported, listening, start: startListening, stop: stopListening } = useSpeechToText((final, interim) => {
+    const base = dictationBaseRef.current;
+    const sep = base && !/\s$/.test(base) ? ' ' : '';
+    onChange(base + (final ? sep + final : '') + (interim ? (base || final ? ' ' : '') + interim : ''));
+  });
+  const toggleMic = () => {
+    if (listening) { stopListening(); return; }
+    dictationBaseRef.current = value;
+    startListening();
+  };
 
   return (
     <div className="chat-composer">
@@ -30,8 +47,19 @@ export default function PromptComposer({ value, onChange, onSend, disabled }: {
           value={value}
           onChange={e => onChange(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } }}
-          placeholder="Ask EMPIRIAL..."
+          placeholder={listening ? 'Listening…' : 'Ask EMPIRIAL...'}
         />
+        {micSupported && (
+          <button
+            type="button"
+            className={`subtle-button composer-mic-button${listening ? ' composer-mic-button-active' : ''}`}
+            aria-label={listening ? 'Stop voice input' : 'Speak your instruction'}
+            aria-pressed={listening}
+            onClick={toggleMic}
+          >
+            {listening ? <MicOff size={15} /> : <Mic size={15} />}
+          </button>
+        )}
         <button aria-label="Send website instruction" className="send-button" onClick={onSend} disabled={disabled}><Send size={15} /></button>
       </div>
     </div>

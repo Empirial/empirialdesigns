@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import {
   ArrowLeft, Check, ExternalLink, Loader2, RefreshCw, Search, ShieldCheck, X,
-  Activity, Star, MapPin, Globe, Gauge,
+  Activity, Star, MapPin, Globe, Gauge, Eye, MousePointerClick, Percent, Hash,
 } from 'lucide-react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -16,6 +16,7 @@ import {
   findGooglePlace,
   getBusinessAccounts,
   getBusinessLocations,
+  getDeploymentStatus,
   getDomainStatus,
   getGoogleConnectUrl,
   getGoogleReviews,
@@ -102,6 +103,17 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
         setRepo(loadedRepo);
         setIdToken(token);
         setPageSpeed(loadedRepo.pagespeed_audit ?? null);
+        // Live Vercel status, not just whatever Firestore had cached from
+        // the last publish — a deploy that finished after the user left the
+        // page (or a redeploy triggered straight from Vercel) would
+        // otherwise leave this page showing a stale Production banner/KPI
+        // tile indefinitely. Same self-healing endpoint BuilderPage.tsx's
+        // header now also refreshes on load.
+        if (loadedRepo.vercel_project_id) {
+          getDeploymentStatus(repoId, token)
+            .then(({ status, url }) => setRepo((prev) => (prev ? { ...prev, vercel_deployment_status: status, vercel_production_url: url ?? prev.vercel_production_url } : prev)))
+            .catch(() => undefined);
+        }
         if (loadedRepo.google_search_console_property) {
           getSearchPerformance(repoId, token).then(setPerformance).catch(() => undefined);
         }
@@ -296,56 +308,89 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
   const isPublished = repo.vercel_deployment_status === 'READY' && !!repo.vercel_production_url;
   const uptimeStatus = uptime?.status || repo.uptime_status;
 
+  // Derived, display-only — no new fetches, just reads the same state the
+  // detail cards below already hold. Purely for the at-a-glance stat strip
+  // (growth-stats) so the page's overall health reads in one glance instead
+  // of requiring a read of all 6 cards underneath it.
+  const seoTile = audit
+    ? { value: `${audit.score}`, sub: '/ 100', score: audit.score, tone: scoreTone(audit.score) }
+    : { value: 'Not checked', sub: 'Run an audit below', score: null, tone: 'neutral' as const };
+  const speedTile = pageSpeed && typeof pageSpeed.performance === 'number'
+    ? { value: `${pageSpeed.performance}`, sub: '/ 100', score: pageSpeed.performance, tone: scoreTone(pageSpeed.performance) }
+    : { value: isPublished ? 'Not checked' : 'Not published', sub: isPublished ? 'Run a check below' : 'Publish first', score: null, tone: 'neutral' as const };
+  const uptimeTile = repo.uptime_monitor_id
+    ? { value: (uptimeStatus && { UP: 'Up', DOWN: 'Down', SEEMS_DOWN: 'Possibly down', PENDING: 'Checking…', PAUSED: 'Paused' }[uptimeStatus]) || 'Unknown', sub: typeof uptime?.uptimeRatio30d === 'number' ? `${uptime.uptimeRatio30d.toFixed(2)}% / 30d` : 'Monitoring', tone: uptimeStatus === 'UP' ? 'ok' : uptimeStatus === 'DOWN' ? 'error' : uptimeStatus === 'SEEMS_DOWN' ? 'warn' : 'neutral' as const }
+    : { value: 'Not monitored', sub: 'Enable below', tone: 'neutral' as const };
+  const reviewsTile = repo.google_place_id
+    ? (reviews && typeof reviews.rating === 'number' ? { value: `${reviews.rating.toFixed(1)}★`, sub: `${reviews.reviewCount ?? 0} reviews`, tone: reviews.rating >= 4 ? 'ok' : reviews.rating >= 3 ? 'warn' : 'error' as const } : { value: 'Loading…', sub: '', tone: 'neutral' as const })
+    : { value: 'Not linked', sub: 'Link below', tone: 'neutral' as const };
+
   return (
     <div className="standalone-page-shell">
-    <div className="page-wide" style={{ maxWidth: 760 }}>
-      <div className="flex items-center gap-3 mb-6">
+    <div className="page-wide" style={{ maxWidth: 900 }}>
+      <div className="growth-header">
         <button type="button" className="icon-button" aria-label="Back to editor" onClick={() => navigate(`/dashboard/editor/${repoId}`)}>
           <ArrowLeft size={16} />
         </button>
         <div>
-          <h1 className="text-lg font-semibold">{repo.repo_name} — Growth</h1>
-          <p className="text-xs text-white/40">Search, speed, uptime, real reviews, and your business's online presence.</p>
+          <span className="eyebrow"><Activity size={12} /> GROWTH</span>
+          <h1 className="page-title">{repo.repo_name}</h1>
+          <p className="page-subtitle">Search, speed, uptime, real reviews, and your business's online presence.</p>
         </div>
       </div>
 
-      {/* Production */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5 mb-5">
-        <h2 className="text-sm font-semibold mb-1">Production</h2>
+      {/* Production — the one fact on this page more important than
+          everything below it, so it gets a banner instead of a card
+          identical to the other 6. */}
+      <div className={`growth-banner ${isPublished ? 'is-live' : ''}`}>
+        <span className="growth-banner-label">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" /> {isPublished ? 'Live in production' : 'Production'}
+        </span>
         {isPublished ? (
-          <div className="flex items-center gap-2 text-sm text-emerald-400">
-            <Check size={15} /> Live at{' '}
-            <a href={repo.vercel_production_url} target="_blank" rel="noreferrer" className="underline inline-flex items-center gap-1">
-              {repo.vercel_production_url} <ExternalLink size={12} />
-            </a>
-          </div>
+          <a href={repo.vercel_production_url} target="_blank" rel="noreferrer" className="growth-banner-url">
+            {repo.vercel_production_url} <ExternalLink size={14} />
+          </a>
         ) : (
-          <p className="text-sm text-white/50">Not published yet — use Publish in the editor first. Search Console, PageSpeed, and uptime monitoring all need a live URL.</p>
+          <p className="growth-banner-empty">Not published yet — use Publish in the editor first. Search Console, PageSpeed, and uptime monitoring all need a live URL.</p>
         )}
-      </section>
+      </div>
+
+      {/* At-a-glance KPI row — a dial per metric (gauge where there's a
+          0-100 score, an icon dial otherwise) instead of plain numbers, so
+          the site's overall health reads in one glance. */}
+      <div className="growth-stats">
+        <StatTile label="SEO readiness" icon={<ShieldCheck size={16} />} {...seoTile} />
+        <StatTile label="PageSpeed" icon={<Gauge size={16} />} {...speedTile} />
+        <StatTile label="Uptime" icon={<Activity size={16} />} {...uptimeTile} />
+        <StatTile label="Reviews" icon={<Star size={16} />} {...reviewsTile} />
+      </div>
+
+      <div className="growth-grid">
 
       {/* Technical SEO + PageSpeed */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5 mb-5">
+      <div className="growth-card span-2">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">Technical SEO readiness</h2>
+            <div className="growth-card-head">
+              <span className="growth-card-title"><span className="growth-icon-chip"><ShieldCheck size={14} /></span> Technical SEO readiness</span>
               <button type="button" className="secondary-button" onClick={runAudit} disabled={auditLoading}>
                 {auditLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Run audit
               </button>
             </div>
             {audit ? (
               <>
-                <p className="text-2xl font-semibold mb-3">{audit.score}<span className="text-sm text-white/40">/100</span></p>
-                <ul className="grid grid-cols-2 gap-2 text-xs">
-                  {Object.entries(audit.checks).map(([key, passed]) => (
-                    <li key={key} className="flex items-center gap-1.5 text-white/60">
-                      {passed ? <Check size={13} className="text-emerald-400" /> : <X size={13} className="text-red-400" />}
-                      {formatCheckLabel(key)}
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-[11px] text-white/30 mt-3">A technical readiness score, not a Google ranking score.</p>
+                <div className="flex items-center gap-4 mb-3">
+                  <RadialGauge value={audit.score} tone={scoreTone(audit.score)} size={64} strokeWidth={6} />
+                  <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                    {Object.entries(audit.checks).map(([key, passed]) => (
+                      <li key={key} className="flex items-center gap-1.5 text-white/60">
+                        {passed ? <Check size={13} className="text-emerald-400" /> : <X size={13} className="text-red-400" />}
+                        {formatCheckLabel(key)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <p className="text-[11px] text-white/30">A technical readiness score, not a Google ranking score.</p>
               </>
             ) : (
               <p className="text-sm text-white/50">Checks titles, meta descriptions, canonical URLs, sitemap.xml, robots.txt, structured data, alt text, and viewport.</p>
@@ -353,19 +398,19 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold flex items-center gap-1.5"><Gauge size={15} /> PageSpeed</h2>
+            <div className="growth-card-head">
+              <span className="growth-card-title"><span className="growth-icon-chip"><Gauge size={14} /></span> PageSpeed</span>
               <button type="button" className="secondary-button" onClick={runPageSpeed} disabled={pageSpeedLoading || !isPublished}>
                 {pageSpeedLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Check
               </button>
             </div>
             {pageSpeed ? (
               <>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <Stat label="Performance" value={scoreOrDash(pageSpeed.performance)} />
-                  <Stat label="Accessibility" value={scoreOrDash(pageSpeed.accessibility)} />
-                  <Stat label="Best practices" value={scoreOrDash(pageSpeed.bestPractices)} />
-                  <Stat label="SEO" value={scoreOrDash(pageSpeed.seo)} />
+                <div className="kpi-mini-row mb-3">
+                  <MiniGauge label="Performance" score={pageSpeed.performance} />
+                  <MiniGauge label="Accessibility" score={pageSpeed.accessibility} />
+                  <MiniGauge label="Best practices" score={pageSpeed.bestPractices} />
+                  <MiniGauge label="SEO" score={pageSpeed.seo} />
                 </div>
                 <p className="text-[11px] text-white/30">Real Core Web Vitals for {pageSpeed.strategy}, from Google PageSpeed Insights.</p>
               </>
@@ -374,11 +419,13 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
             )}
           </div>
         </div>
-      </section>
+      </div>
 
       {/* Google Search Console */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5 mb-5">
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-1.5"><Search size={15} /> Google Search</h2>
+      <div className="growth-card span-2">
+        <div className="growth-card-head">
+          <span className="growth-card-title"><span className="growth-icon-chip"><Search size={14} /></span> Google Search</span>
+        </div>
 
         {(seoStatus === 'NOT_CONFIGURED' || seoStatus === 'GENERATED') && (
           <div>
@@ -392,10 +439,12 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
 
         {seoStatus === 'GOOGLE_CONNECTED' && (
           <div>
-            <p className="text-sm text-emerald-400 flex items-center gap-1.5 mb-3"><Check size={14} /> Google connected</p>
-            <button type="button" className="secondary-button" onClick={startVerification} disabled={busy === 'verify-start'}>
-              {busy === 'verify-start' ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Get verification token
-            </button>
+            <StatusPill tone="ok" className="mb-3"><Check size={13} /> Google connected</StatusPill>
+            <div>
+              <button type="button" className="secondary-button" onClick={startVerification} disabled={busy === 'verify-start'}>
+                {busy === 'verify-start' ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Get verification token
+              </button>
+            </div>
           </div>
         )}
 
@@ -410,23 +459,25 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
 
         {(seoStatus === 'VERIFIED' || seoStatus === 'SITEMAP_SUBMITTED') && (
           <div>
-            <p className="text-sm text-emerald-400 flex items-center gap-1.5 mb-3"><Check size={14} /> Site ownership verified</p>
+            <StatusPill tone="ok" className="mb-3"><Check size={13} /> Site ownership verified</StatusPill>
             {seoStatus === 'VERIFIED' ? (
-              <button type="button" className="primary-button mb-4" onClick={submitSitemap} disabled={busy === 'sitemap'}>
-                {busy === 'sitemap' ? <Loader2 size={14} className="animate-spin" /> : null} Submit sitemap
-              </button>
+              <div className="mb-4">
+                <button type="button" className="primary-button" onClick={submitSitemap} disabled={busy === 'sitemap'}>
+                  {busy === 'sitemap' ? <Loader2 size={14} className="animate-spin" /> : null} Submit sitemap
+                </button>
+              </div>
             ) : (
-              <p className="text-sm text-emerald-400 flex items-center gap-1.5 mb-4"><Check size={14} /> Sitemap submitted</p>
+              <StatusPill tone="ok" className="mb-4"><Check size={13} /> Sitemap submitted</StatusPill>
             )}
 
             <div className="rounded-lg bg-black/20 p-4">
               <p className="text-xs text-white/40 mb-2">Last 28 days</p>
               {performance?.hasData ? (
-                <div className="grid grid-cols-4 gap-3 text-sm">
-                  <Stat label="Impressions" value={performance.impressions ?? 0} />
-                  <Stat label="Clicks" value={performance.clicks ?? 0} />
-                  <Stat label="CTR" value={`${((performance.ctr ?? 0) * 100).toFixed(1)}%`} />
-                  <Stat label="Avg. position" value={(performance.avgPosition ?? 0).toFixed(1)} />
+                <div className="kpi-stat-row">
+                  <KpiStat icon={<Eye size={14} />} label="Impressions" value={performance.impressions ?? 0} />
+                  <KpiStat icon={<MousePointerClick size={14} />} label="Clicks" value={performance.clicks ?? 0} />
+                  <KpiStat icon={<Percent size={14} />} label="CTR" value={`${((performance.ctr ?? 0) * 100).toFixed(1)}%`} />
+                  <KpiStat icon={<Hash size={14} />} label="Avg. position" value={(performance.avgPosition ?? 0).toFixed(1)} />
                 </div>
               ) : (
                 <p className="text-sm text-white/40">Collecting Google Search data…</p>
@@ -434,12 +485,12 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
             </div>
           </div>
         )}
-      </section>
+      </div>
 
       {/* Uptime */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5 mb-5">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold flex items-center gap-1.5"><Activity size={15} /> Uptime</h2>
+      <div className="growth-card">
+        <div className="growth-card-head">
+          <span className="growth-card-title"><span className="growth-icon-chip"><Activity size={14} /></span> Uptime</span>
           <button type="button" className="secondary-button" onClick={toggleUptime} disabled={uptimeBusy || !isPublished}>
             {uptimeBusy ? <Loader2 size={14} className="animate-spin" /> : null}
             {repo.uptime_monitor_id ? 'Stop monitoring' : 'Start monitoring'}
@@ -455,11 +506,13 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
         ) : (
           <p className="text-sm text-white/50">{isPublished ? 'Get alerted if your live site goes down.' : 'Publish the site first.'}</p>
         )}
-      </section>
+      </div>
 
       {/* Reviews */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5 mb-5">
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-1.5"><Star size={15} /> Reviews</h2>
+      <div className="growth-card">
+        <div className="growth-card-head">
+          <span className="growth-card-title"><span className="growth-icon-chip"><Star size={14} /></span> Reviews</span>
+        </div>
 
         {!repo.google_place_id ? (
           <div>
@@ -517,11 +570,13 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
         ) : (
           <p className="text-sm text-white/50">No reviews found for the linked business yet.</p>
         )}
-      </section>
+      </div>
 
       {/* Business Profile */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5 mb-5">
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-1.5"><MapPin size={15} /> Business Profile</h2>
+      <div className="growth-card">
+        <div className="growth-card-head">
+          <span className="growth-card-title"><span className="growth-icon-chip"><MapPin size={14} /></span> Business Profile</span>
+        </div>
 
         {linkedLocation ? (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 text-sm text-white/70">
@@ -558,18 +613,22 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
             </button>
           </div>
         )}
-      </section>
+      </div>
 
       {/* Domain */}
-      <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-1.5"><Globe size={15} /> Domain</h2>
+      <div className="growth-card">
+        <div className="growth-card-head">
+          <span className="growth-card-title"><span className="growth-icon-chip"><Globe size={14} /></span> Domain</span>
+        </div>
 
         {repo.custom_domain ? (
           <div>
             <div className="flex items-center gap-2 mb-3">
-              {repo.custom_domain_status === 'VERIFIED' ? <Check size={14} className="text-emerald-400" /> : <Loader2 size={14} className="text-amber-400" />}
+              <StatusPill tone={repo.custom_domain_status === 'VERIFIED' ? 'ok' : 'warn'}>
+                {repo.custom_domain_status === 'VERIFIED' ? <Check size={13} /> : <Loader2 size={13} className="animate-spin" />}
+                {repo.custom_domain_status === 'VERIFIED' ? 'Connected' : 'Waiting on DNS'}
+              </StatusPill>
               <p className="text-sm text-white">{repo.custom_domain}</p>
-              <span className="text-xs text-white/40">{repo.custom_domain_status === 'VERIFIED' ? 'Connected' : 'Waiting on DNS'}</span>
             </div>
             {repo.custom_domain_status !== 'VERIFIED' && (
               <p className="text-xs text-white/40 mb-3">Add the DNS records your registrar shows for this domain, then recheck. This can take a few hours to propagate.</p>
@@ -600,7 +659,9 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
             {!repo.vercel_project_id && <p className="text-[11px] text-white/30 mt-2">Publish via Vercel first.</p>}
           </div>
         )}
-      </section>
+      </div>
+
+      </div>
 
       {notice && <div className="toast-notice"><Check size={15} />{notice}</div>}
     </div>
@@ -608,29 +669,103 @@ export default function GrowthPage({ repoId, navigate }: { repoId: string; navig
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+type Tone = 'ok' | 'warn' | 'error' | 'neutral';
+
+/** One reusable tinted-surface status readout — see dashboard-theme.css's
+ * .status-pill. Replaces this page's previous ad hoc "colored text + icon"
+ * repeated at every status line with one consistent look. */
+function StatusPill({ tone, className = '', children }: { tone: Tone; className?: string; children: ReactNode }) {
+  return <span className={`status-pill tone-${tone} ${className}`}>{children}</span>;
+}
+
+function scoreTone(score: number): Tone {
+  return score >= 80 ? 'ok' : score >= 50 ? 'warn' : 'error';
+}
+
+/** One dial in the at-a-glance KPI row at the top of the page — a radial
+ * gauge for anything with a 0-100 score, an icon dial otherwise (uptime,
+ * reviews have no such score). See dashboard-theme.css's .growth-stats. */
+function StatTile({ label, icon, value, sub, score, tone }: { label: string; icon: ReactNode; value: string; sub?: string; score?: number | null; tone: Tone }) {
   return (
-    <div>
-      <p className="text-lg font-semibold">{value}</p>
-      <p className="text-[11px] text-white/40">{label}</p>
+    <div className="growth-stat-tile">
+      <span className="growth-stat-tile-dial">
+        {typeof score === 'number'
+          ? <RadialGauge value={score} tone={tone} size={48} strokeWidth={5} />
+          : <span className={`growth-stat-tile-dial-icon tone-${tone}`}>{icon}</span>}
+      </span>
+      <span className="growth-stat-tile-body">
+        <p className="growth-stat-tile-label">{label}</p>
+        <p className={`growth-stat-tile-value tone-${tone}`}>{value}</p>
+        {sub && <p className="growth-stat-tile-sub">{sub}</p>}
+      </span>
     </div>
   );
 }
 
-function scoreOrDash(score: number | null): string {
-  return typeof score === 'number' ? String(score) : '—';
+/** SVG donut gauge for a 0-100 score — used both in the KPI row and inline
+ * in the Technical SEO / PageSpeed cards, so a score always reads as a dial
+ * first and a number second. See dashboard-theme.css's .kpi-gauge*. */
+function RadialGauge({ value, tone, size = 56, strokeWidth = 6 }: { value: number; tone: Tone; size?: number; strokeWidth?: number }) {
+  const clamped = Math.max(0, Math.min(100, value));
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - clamped / 100);
+  const center = size / 2;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="kpi-gauge" role="img" aria-label={`Score ${Math.round(clamped)} out of 100`}>
+      <circle className="kpi-gauge-track" cx={center} cy={center} r={radius} strokeWidth={strokeWidth} />
+      <circle
+        className={`kpi-gauge-arc tone-${tone}`}
+        cx={center} cy={center} r={radius} strokeWidth={strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        transform={`rotate(-90 ${center} ${center})`}
+      />
+      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className={`kpi-gauge-text tone-${tone}`} style={{ fontSize: size * 0.32 }}>
+        {Math.round(clamped)}
+      </text>
+    </svg>
+  );
+}
+
+/** One small gauge + label, used in a row for PageSpeed's 4 sub-scores. */
+function MiniGauge({ label, score }: { label: string; score: number | null }) {
+  const tone = typeof score === 'number' ? scoreTone(score) : 'neutral';
+  return (
+    <div className="kpi-mini">
+      {typeof score === 'number'
+        ? <RadialGauge value={score} tone={tone} size={52} strokeWidth={5} />
+        : <RadialGauge value={0} tone="neutral" size={52} strokeWidth={5} />}
+      <p className="kpi-mini-label">{label}</p>
+    </div>
+  );
+}
+
+/** One icon + number stat, used for a row of related metrics (Search
+ * Console's impressions/clicks/CTR/position) instead of bare label/value
+ * pairs. See dashboard-theme.css's .kpi-stat*. */
+function KpiStat({ icon, label, value }: { icon: ReactNode; label: string; value: string | number }) {
+  return (
+    <div className="kpi-stat">
+      <span className="kpi-stat-icon">{icon}</span>
+      <span>
+        <p className="kpi-stat-value">{value}</p>
+        <p className="kpi-stat-label">{label}</p>
+      </span>
+    </div>
+  );
 }
 
 function UptimeBadge({ status }: { status?: string }) {
-  const map: Record<string, { label: string; color: string }> = {
-    UP: { label: 'Up', color: 'text-emerald-400' },
-    DOWN: { label: 'Down', color: 'text-red-400' },
-    SEEMS_DOWN: { label: 'Possibly down', color: 'text-amber-400' },
-    PENDING: { label: 'Checking…', color: 'text-white/50' },
-    PAUSED: { label: 'Paused', color: 'text-white/40' },
+  const map: Record<string, { label: string; tone: Tone }> = {
+    UP: { label: 'Up', tone: 'ok' },
+    DOWN: { label: 'Down', tone: 'error' },
+    SEEMS_DOWN: { label: 'Possibly down', tone: 'warn' },
+    PENDING: { label: 'Checking…', tone: 'neutral' },
+    PAUSED: { label: 'Paused', tone: 'neutral' },
   };
-  const entry = (status && map[status]) || { label: 'Unknown', color: 'text-white/40' };
-  return <p className={`text-sm flex items-center gap-1.5 ${entry.color}`}><span className="inline-block h-1.5 w-1.5 rounded-full bg-current" />{entry.label}</p>;
+  const entry = (status && map[status]) || { label: 'Unknown', tone: 'neutral' as const };
+  return <StatusPill tone={entry.tone}><span className="inline-block h-1.5 w-1.5 rounded-full bg-current" />{entry.label}</StatusPill>;
 }
 
 function formatCheckLabel(key: string): string {

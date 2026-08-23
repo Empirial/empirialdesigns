@@ -1,4 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /dashboard
+Disallow: /auth
+Disallow: /staff
 
 Sitemap: https://empirialdesigns.co.za/sitemap.xml

@@ -2,10 +2,13 @@
 
 Status: phases 1–6 implemented **and deployed**, but **the actual sync
 mechanics diverged from this plan** — see "Implementation status" below for
-what's real vs. what was never built (the Firestore-trigger + scheduled-sweep
-half of the sync design in particular). Phase 4/5 frontend wiring is also
-done (see "Phases 4/5/7" below — no longer paused); phase 7 (cleanup) still
-open. Companion to [CODE_REVIEW.md](./CODE_REVIEW.md). See also
+what's real vs. what was never built. The scheduled-sweep half of that gap
+is now closed (`scheduledRepoSync`, written but **not yet verified live** —
+see that section for the distinction from the rest of this doc's "verified
+via direct Firestore/Function calls" claims). Phase 4/5 frontend wiring is
+also done (see "Phases 4/5/7" below — no longer paused); phase 7 (cleanup)
+is also done — its one remaining line item turned out to already be moot,
+see "Cleanup" below. Companion to [CODE_REVIEW.md](./CODE_REVIEW.md). See also
 [MULTI_AGENT_ORCHESTRATION.md](./MULTI_AGENT_ORCHESTRATION.md), which sits
 upstream of everything in this document — it decides what `<file>` blocks
 get produced; everything below about how those blocks get stored, synced,
@@ -121,36 +124,55 @@ Firebase Auth + Cloud Function + Firestore REST calls against the real
   own edited files on the first follow-up edit. This isn't a bug so much as
   a design that ended up different from the plan: GitHub, not Firestore, is
   the real source of truth for a fresh generation.
-- ⚠️ **Phase 2 — sync mechanics, half never built.** `syncRepoToGitHub` as a
-  standalone reusable function, the `onRepoFileWrite` Firestore trigger, the
-  `scheduledRepoSync` 5-minute sweep, and the `tryClaimSync` concurrency
-  transaction described below **do not exist in the codebase** — confirmed
-  by `functions/index.js`'s own comment directly above `requestRepoSync`
-  (`index.js:1538`) and by `functions/agents/05-agent-loop/pipeline.js`'s
-  header comment. What actually keeps GitHub in sync instead, all
-  explicit/synchronous rather than trigger-driven:
+- ⚠️→✅ **Phase 2 — sync mechanics, the backstop half is now built, but not
+  the trigger.** The original plan had two pieces beyond explicit sync: a
+  per-write `onRepoFileWrite` Firestore trigger with an edit-count threshold,
+  and a scheduled sweep as the backstop for whatever the trigger missed. Only
+  the trigger stays unbuilt — `tryClaimSync`/the threshold-triggered
+  invocation of a standalone `syncRepoToGitHub` **do not exist**. What's real
+  today:
   1. **`aiChat` commits every edit to GitHub inline, in the same request** —
      not eventually. After the pipeline produces `<file>` blocks, `aiChat`
      writes them to `files/{path}` in Firestore *and* calls
-     `commitFilesToGithub` before the response ends (`index.js:1134`-1203).
-     There is no counter, no threshold, no batching — one edit, one commit,
-     synchronously, before the user's stream finishes.
-  2. **`requestRepoSync`** (`index.js:1548`) — an explicit-flush HTTP
-     endpoint, called by `SaveButton.tsx`. Reads the entire current `files`
-     subcollection and commits it to GitHub. This is real and deployed —
-     it's specifically the piece the original trigger/sweep design was
-     supposed to make unnecessary, kept as the actual mechanism instead.
-  3. **`publishWebsite`** (`index.js:1597`) always force-syncs the current
-     `files` subcollection to GitHub before triggering a Vercel deployment
-     (non-fatally — a sync failure there is logged and publish continues),
-     specifically *because* there's no trigger/sweep to otherwise guarantee
-     GitHub isn't stale by publish time.
-  There is currently no backstop for a repo that has unsynced Firestore edits,
-  was never explicitly Saved, and is never Published — those edits simply
-  stay `dirty` in Firestore indefinitely. Since `aiChat` (the far more common
-  edit path) already syncs synchronously per point 1, this gap is narrower
-  in practice than the original design implied, but it's real for any write
-  path that only touches Firestore.
+     `commitFilesToGithub` before the response ends (`index.js:1134`-1210ish).
+     There is no counter-driven batching — one edit, one commit, synchronously,
+     before the user's stream finishes. The Firestore write itself now also
+     stamps `github_sync_status: 'dirty'`, `last_edit_at`, and bumps
+     `pending_edit_count` *before* attempting that commit, so a request that
+     dies (timeout, crash) between the Firestore write and the GitHub commit
+     still leaves a `dirty` repo the sweep below can find — previously it
+     would have silently stayed `clean`-by-default with a stale GitHub copy.
+     On a successful commit these fields flip back to `clean`; on a failed
+     commit they go to `error` (previously `'pending'`, a value nothing else
+     recognized — renamed so the sweep's query actually catches it).
+  2. **`requestRepoSync`** (`index.js`, `exports.requestRepoSync`) — an
+     explicit-flush HTTP endpoint, called by `SaveButton.tsx`. Now a thin
+     wrapper over a shared `syncRepoFilesToGithub(repoId, ref, repo)` helper
+     that reads the entire current `files` subcollection, commits it to
+     GitHub, and marks the repo `clean`/`error`.
+  3. **`publishWebsite`** always force-syncs the current `files` subcollection
+     to GitHub before triggering a Vercel deployment (non-fatally — a sync
+     failure there is logged and publish continues) and now also marks the
+     repo `clean` on a successful pre-publish sync (previously it committed
+     to GitHub but never updated `github_sync_status`, so a published repo
+     could stay flagged `dirty` in Firestore forever).
+  4. **`scheduledRepoSync`** (new — `functions.pubsub.schedule('every 5
+     minutes')`) — the actual backstop. Queries `user_repos` where
+     `github_sync_status in ['dirty', 'error']`, skips any repo whose
+     `last_edit_at` is inside a 2-minute idle window (to avoid racing an edit
+     still in flight), and calls the same `syncRepoFilesToGithub` helper for
+     the rest. Catches the case the original plan's item 4 was meant to
+     catch: a manual Firestore-only edit (`saveRepoFiles`, client-side) where
+     the user never clicked Save/Publish and closed the tab — that path now
+     also stamps `dirty`/`last_edit_at`/`pending_edit_count` itself (it
+     didn't before; its own comment used to claim a Firestore trigger was
+     watching it, which was never true).
+  **Written but not yet verified live** — unlike the rest of this doc's
+  "Deployment state" section (real Firebase Auth + Function + Firestore
+  calls against the deployed project), this sweep hasn't been observed
+  actually firing on a schedule or syncing a real dirty repo yet. No new
+  Firestore composite index needed (`in` on a single field only requires the
+  automatic single-field index).
 - ✅ **Phase 3 — repoint `aiChat`.** It now resolves + verifies repo
   ownership before calling the AI provider at all. **Superseded/updated by
   [MULTI_AGENT_ORCHESTRATION.md](./MULTI_AGENT_ORCHESTRATION.md):** `aiChat`
@@ -317,15 +339,19 @@ commits to GitHub inline, in the same request, before its response ends.
   GitHub" goal above. In practice this is fine because a single small commit
   (a handful of section files) is fast relative to the LLM calls already in
   the same request.
-- **Explicit sync path (`requestRepoSync` / `SaveButton.tsx`):** the only
-  other way Firestore's cache reaches GitHub — reads the current `files`
-  subcollection and commits it, fire-and-forget from the client after a
-  manual Firestore-only save. There's no scheduled or triggered fallback
-  behind it (see Phase 2).
+- **Explicit sync path (`requestRepoSync` / `SaveButton.tsx`):** reads the
+  current `files` subcollection and commits it, fire-and-forget from the
+  client after a manual Firestore-only save.
 - **Publish-time force-sync (`publishWebsite`):** always flushes Firestore's
-  current `files` subcollection to GitHub before deploying, specifically to
-  paper over the missing trigger/sweep — publish should never ship stale
-  content even if something upstream failed to sync.
+  current `files` subcollection to GitHub before deploying — publish should
+  never ship stale content even if something upstream failed to sync.
+- **Scheduled sweep (`scheduledRepoSync`, every 5 minutes):** the backstop
+  for anything the three paths above miss — any repo left `dirty`/`error`
+  with no edit in the last 2 minutes gets flushed to GitHub the same way
+  `requestRepoSync` does. There's still no *trigger* (no per-write Firestore
+  function reacting the instant a file doc changes) — only this sweep — so a
+  Firestore-only edit can sit unsynced for up to ~5-7 minutes in the worst
+  case, not seconds.
 - **Cold-start read path (opening a project):** check the Firestore cache
   first; fall back to GitHub (`getRepoTree`, via
   `hydrateRepoFilesFromGithubIfEmpty`) only if the cache is empty — see
@@ -344,22 +370,24 @@ flowchart LR
         AC[aiChat]
         RRS[requestRepoSync]
         PUB[publishWebsite]
+        SWEEP[scheduledRepoSync\nevery 5 min]
     end
 
     subgraph fs["Firestore (fast cache)"]
         FILES[(user_repos/id/files/path)]
-        STATUS[(github_sync_status,\nlast_synced_at, last_commit_sha)]
+        STATUS[(github_sync_status,\nlast_edit_at, pending_edit_count,\nlast_synced_at, last_commit_sha)]
     end
 
     GH[(GitHub repo — durable source)]
     VC[(Vercel deployment)]
 
     U -->|prompt / edit| AC
-    AC -->|write file docs| FILES
+    AC -->|write file docs, mark dirty| FILES
     AC -->|commit inline, same request| GH
     AC --> STATUS
     FILES -->|local state read| PV
 
+    SAVE -->|write file docs, mark dirty| FILES
     SAVE -->|explicit flush, fire-and-forget| RRS
     RRS -->|reads current files| FILES
     RRS -->|commit| GH
@@ -369,16 +397,25 @@ flowchart LR
     PUB -->|commit| GH
     PUB -->|deploy from repo| VC
 
+    STATUS -.->|query dirty/error,\nidle > 2 min| SWEEP
+    SWEEP -->|reads current files| FILES
+    SWEEP -->|commit| GH
+    SWEEP --> STATUS
+
     U -.->|open project, cold start only| FILES
     FILES -.->|cache empty?| GH
     GH -.->|getRepoTree, hydrate once| PV
 ```
 
-**No node in this diagram is a Firestore trigger or a scheduled function —
-every arrow into GitHub is a direct call from `aiChat`, `requestRepoSync`, or
-`publishWebsite` in response to something a user did.** The diagram in
+**One node in this diagram — `scheduledRepoSync` — is a scheduled function;
+every other arrow into GitHub is still a direct call from `aiChat`,
+`requestRepoSync`, or `publishWebsite` in response to something a user did.
+There is still no Firestore *trigger*** (nothing reacts the instant a
+`files/{path}` doc is written — only the 5-minute sweep catches it, and only
+after a 2-minute idle window). The diagram in
 [engine-diagram.html](./engine-diagram.html) has not been updated to match
-this and still shows the trigger/sweep design below.
+this and still shows the older design (a per-write trigger this repo still
+doesn't have, described alongside a sweep it now does).
 
 ## Everything below this line is the original implementation plan
 
@@ -404,12 +441,17 @@ still accurate.
 
 ## Cloud Functions changes
 
-**Items 2-4 below (a standalone `syncRepoToGitHub`, the Firestore trigger,
-the scheduled sweep) were never built** — see "Implementation status"'s
-Phase 2. What exists instead: the sync logic lives inline inside `aiChat`
-(commits immediately, no threshold) and inside `requestRepoSync` (explicit
-flush only, no trigger calls it). Kept below verbatim for the original
-rationale.
+**Items 2 and 4 below now exist, in a different shape than described here —
+item 3 (the Firestore trigger + edit-count threshold) still doesn't** — see
+"Implementation status"'s Phase 2. What shipped: a shared
+`syncRepoFilesToGithub` helper (item 2's job, minus the standalone-export
+framing — it's an internal function, not its own Cloud Function) used by
+both `requestRepoSync` and the new `scheduledRepoSync` (item 4's job, same
+5-minute cadence, same "query dirty repos" idea, but keyed off
+`github_sync_status`/`last_edit_at` rather than a `last_edit_at`-only query
+with no status field). No threshold/counter decides *when* to sync per repo
+— `aiChat` still commits immediately on every edit; only the sweep polls on
+a timer. Kept below (mostly) verbatim for the original rationale.
 
 1. **`aiChat`** — after parsing `<file>` blocks from the model response, write
    each changed file to `files/{path}` (not just stream text back), bump
@@ -471,9 +513,11 @@ rationale.
   `Preview.tsx` — all deleted (see `docs/TO_DELETE.md`'s history in `git
   log`; that file is itself deleted now that its list is empty).
 - ✅ `CLAUDE.md`'s "Current transition state" section updated to match.
-- ⏸️ `src/lib/claude.ts` — confirmed fully dead (its only consumer,
-  `LovableSidebar.tsx`, is itself never rendered anywhere), just not deleted
-  yet. Candidate for the next cleanup pass.
+- ✅ `src/lib/claude.ts` / `LovableSidebar.tsx` — re-checked: neither file
+  exists in this checkout (`find src -iname "*claude*"` / `-iname
+  "*LovableSidebar*"` both come back empty, and neither shows up in `git
+  log` as ever having been deleted here either) — this line was stale, not
+  actually an open item. Phase 7 has nothing left outstanding.
 
 ## Suggested implementation order
 
@@ -490,10 +534,21 @@ rationale.
 
 ## Open questions
 
-- Edit-counter threshold: is 3 the right default, or should it vary by how
-  large a typical AI turn's diff is?
-- Idle-sweep window: 2 minutes proposed above — acceptable staleness for a
-  repo a user just… stopped touching?
+- Edit-counter threshold: moot for now — no threshold/counter gates *when*
+  a sync happens (`aiChat` still syncs immediately on every edit); only the
+  sweep's idle window below does.
+- Idle-sweep window: `scheduledRepoSync` shipped with 2 minutes, on a
+  5-minute cadence — worst case ~5-7 minutes of staleness for a
+  Firestore-only edit nobody explicitly Saved. Not yet tuned against real
+  traffic since the sweep hasn't been observed live yet (see Phase 2).
 - Does `Preview.tsx`'s ZIP export stay as-is, or should export also offer
   "clone the GitHub repo" now that GitHub is guaranteed current within one
-  sync cycle?
+  sync cycle? (`Preview.tsx` itself is deleted — this would live in
+  `BuilderPage` now, if it happens at all.)
+- ✅ The topbar sync-status affordance described under "Front-end changes"
+  below is now built: `SyncStatusBadge.tsx`, rendered in `BuilderPage.tsx`'s
+  preview-pill header next to `SaveButton` (hidden for repos with no
+  `repo_url`). `Repo` now carries `github_sync_status`/`pending_edit_count`/
+  `last_edit_at`/`last_synced_at`/`last_commit_sha`, kept live via an
+  `onSnapshot` listener on the repo doc rather than a one-shot fetch, so it
+  reflects `aiChat`/`saveRepoFiles`/`scheduledRepoSync` writes as they land.

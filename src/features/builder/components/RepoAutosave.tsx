@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSandpack } from '@codesandbox/sandpack-react';
 import { saveRepoFiles } from '@/features/repositories/lib/repos.service';
 
@@ -7,9 +7,19 @@ import { saveRepoFiles } from '@/features/repositories/lib/repos.service';
 // debounce, same target field (`user_repos/{id}.vfs`).
 export default function RepoAutosave({ repoId }: { repoId: string }) {
   const { sandpack } = useSandpack();
+  const initialFilesRef = useRef<typeof sandpack.files | null>(null);
 
   useEffect(() => {
     if (!sandpack.files || Object.keys(sandpack.files).length === 0) return;
+
+    // Loading a project must be read-only. In particular, a browser tab that
+    // predates a repair can hold a stale Sandpack VFS; saving that initial VFS
+    // on mount would overwrite the newly restored GitHub file without the
+    // user making an edit. Only later in-session file changes are autosaved.
+    if (initialFilesRef.current === null) {
+      initialFilesRef.current = sandpack.files;
+      return;
+    }
 
     const timeout = setTimeout(() => {
       saveRepoFiles(repoId, sandpack.files).catch((err) => {

@@ -44,13 +44,15 @@
 /* ============ Shared primitives ============ */
 
 .platform,
-.chat-page-shell {
+.chat-page-shell,
+.standalone-page-shell {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Arial, sans-serif;
   color: var(--dash-text);
 }
 
 .platform *,
-.chat-page-shell * {
+.chat-page-shell *,
+.standalone-page-shell * {
   box-sizing: border-box;
 }
 
@@ -826,6 +828,153 @@
   padding: 2.25rem 1.5rem 3rem;
 }
 
+/* ============ Growth page (Growth.tsx) ============ */
+
+.growth-header { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.5rem; }
+.growth-header .page-title { margin: 0.15rem 0 0.15rem; font-size: 1.35rem; }
+.growth-header .page-subtitle { font-size: 0.85rem; }
+
+/* The one fact on this page more important than the 6 detail cards below it
+   — an elevated, accent-lit banner rather than a box identical to the rest
+   (the "everything is one generic card" pattern this redesign specifically
+   targets), so "is this even live" reads instantly. */
+.growth-banner {
+  position: relative;
+  border-radius: var(--dash-radius-lg);
+  padding: 1.4rem 1.75rem;
+  margin-bottom: 1.5rem;
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  box-shadow: var(--dash-shadow-card);
+}
+.growth-banner.is-live {
+  border-color: rgba(134, 239, 172, 0.22);
+  background: linear-gradient(135deg, rgba(134, 239, 172, 0.07), var(--dash-surface) 55%);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45), 0 2px 28px rgba(52, 211, 153, 0.1);
+}
+.growth-banner-label {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--dash-text-faint);
+}
+.growth-banner.is-live .growth-banner-label { color: #86efac; }
+.growth-banner-url {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  margin-top: 0.55rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--dash-text);
+  text-decoration: none;
+}
+.growth-banner-url:hover { color: #86efac; }
+.growth-banner-empty { margin-top: 0.4rem; font-size: 0.85rem; color: var(--dash-text-soft); max-width: 34rem; }
+
+/* At-a-glance KPI row — the page's dashboard headline: a gauge or icon dial
+   per metric instead of bare text, so overall site health reads as a glance
+   at four dials, not a read of every card below. */
+.growth-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+.growth-stat-tile {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.15rem;
+  border-radius: var(--dash-radius-lg);
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border-soft);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px rgba(0, 0, 0, 0.24);
+}
+.growth-stat-tile-dial { flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center; }
+.growth-stat-tile-dial-icon {
+  width: 3rem; height: 3rem; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--dash-surface-hover); border: 1px solid var(--dash-border-soft);
+}
+.growth-stat-tile-dial-icon.tone-ok { color: #86efac; background: rgba(134, 239, 172, 0.1); border-color: rgba(134, 239, 172, 0.22); }
+.growth-stat-tile-dial-icon.tone-warn { color: #fbbf87; background: rgba(251, 191, 135, 0.1); border-color: rgba(251, 191, 135, 0.22); }
+.growth-stat-tile-dial-icon.tone-error { color: #fca5a5; background: rgba(252, 165, 165, 0.1); border-color: rgba(252, 165, 165, 0.22); }
+.growth-stat-tile-dial-icon.tone-neutral { color: var(--dash-text-faint); }
+.growth-stat-tile-body { min-width: 0; }
+.growth-stat-tile-label {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-size: 0.68rem; font-weight: 600; letter-spacing: 0.02em; color: var(--dash-text-faint); margin-bottom: 0.3rem;
+}
+.growth-stat-tile-value { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; }
+.growth-stat-tile-value.tone-ok { color: #86efac; }
+.growth-stat-tile-value.tone-warn { color: #fbbf87; }
+.growth-stat-tile-value.tone-error { color: #fca5a5; }
+.growth-stat-tile-value.tone-neutral { color: var(--dash-text-faint); font-size: 1rem; font-weight: 600; }
+.growth-stat-tile-sub { margin: 0.15rem 0 0; font-size: 0.72rem; color: var(--dash-text-faint); }
+
+/* Radial gauge — used for the 0-100 scores (SEO audit, PageSpeed) both in
+   the KPI row and inline in their detail cards, so a score is always a dial
+   first and a number second. */
+.kpi-gauge { flex-shrink: 0; }
+.kpi-gauge-track { fill: none; stroke: rgba(255, 255, 255, 0.08); }
+.kpi-gauge-arc { fill: none; stroke-linecap: round; transition: stroke-dashoffset 500ms var(--dash-ease); }
+.kpi-gauge-arc.tone-ok { stroke: #86efac; }
+.kpi-gauge-arc.tone-warn { stroke: #fbbf87; }
+.kpi-gauge-arc.tone-error { stroke: #fca5a5; }
+.kpi-gauge-arc.tone-neutral { stroke: var(--dash-border); }
+.kpi-gauge-text { font-weight: 700; fill: var(--dash-text); }
+.kpi-gauge-text.tone-ok { fill: #86efac; }
+.kpi-gauge-text.tone-warn { fill: #fbbf87; }
+.kpi-gauge-text.tone-error { fill: #fca5a5; }
+.kpi-gauge-text.tone-neutral { fill: var(--dash-text-faint); }
+
+/* Row of small gauges — PageSpeed's 4 sub-scores. */
+.kpi-mini-row { display: flex; flex-wrap: wrap; gap: 1.1rem; }
+.kpi-mini { display: flex; flex-direction: column; align-items: center; gap: 0.45rem; width: 4.6rem; text-align: center; }
+.kpi-mini-label { font-size: 0.66rem; color: var(--dash-text-faint); line-height: 1.25; }
+
+/* Icon + number stat, used for Search Console's 4 metrics — a KPI row
+   inside a card rather than plain label/value pairs. */
+.kpi-stat-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
+@media (min-width: 480px) { .kpi-stat-row { grid-template-columns: repeat(4, 1fr); } }
+.kpi-stat {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: var(--dash-radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--dash-border-soft);
+}
+.kpi-stat-icon {
+  flex-shrink: 0; width: 1.7rem; height: 1.7rem; border-radius: var(--dash-radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--dash-accent-soft); color: var(--dash-accent-1);
+}
+.kpi-stat-value { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; }
+.kpi-stat-label { font-size: 0.66rem; color: var(--dash-text-faint); }
+
+/* Detail card grid — was a flat 1-column stack of near-identical boxes; a
+   2-column grid on wide screens gives the page real shape instead of one
+   long scroll of the same box repeated 6 times. */
+.growth-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+@media (min-width: 900px) {
+  .growth-grid { grid-template-columns: repeat(2, 1fr); }
+  .growth-grid > .growth-card.span-2 { grid-column: span 2; }
+}
+
+.growth-card {
+  border-radius: var(--dash-radius-lg);
+  padding: 1.2rem 1.35rem;
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border-soft);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+.growth-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.9rem; }
+.growth-card-title { display: flex; align-items: center; gap: 0.55rem; font-size: 0.86rem; font-weight: 600; }
+.growth-icon-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.75rem; height: 1.75rem; border-radius: var(--dash-radius-sm);
+  background: var(--dash-accent-soft); color: var(--dash-accent-1);
+  flex-shrink: 0;
+}
+
 /* ============ Builder / chat shell ============ */
 
 .chat-page-shell {
@@ -908,6 +1057,37 @@
 }
 .chat-share-button:hover { background: var(--dash-surface-hover); }
 
+/* Status pill — one reusable "tinted surface + icon + label" treatment for
+   any inline status (GitHub sync in the builder topbar — SyncStatusBadge.tsx
+   composes this with its own height/whitespace rules; Growth page status
+   text — Growth.tsx), instead of every screen inventing its own ad hoc
+   "colored text + icon" pattern. Tone is the only thing a caller picks. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--dash-radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status-pill.tone-ok { color: #86efac; background: rgba(134, 239, 172, 0.1); }
+.status-pill.tone-warn { color: #fbbf87; background: rgba(251, 191, 135, 0.1); }
+.status-pill.tone-error { color: #fca5a5; background: rgba(252, 165, 165, 0.1); }
+.status-pill.tone-neutral { color: var(--dash-text-faint); background: transparent; }
+
+/* Sync status badge — see SyncStatusBadge.tsx. A .status-pill with the
+   builder topbar's own height/weight to match SaveButton/ThemeButton next
+   to it. */
+.sync-status-badge {
+  height: 2.1rem;
+  padding: 0 0.7rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.sync-status-badge.tone-neutral svg { color: #86efac; }
+
 /* Project menu dropdown */
 .chat-project-menu {
   position: absolute;
@@ -989,7 +1169,29 @@
   border: 1px solid var(--dash-border-soft);
   color: var(--dash-text);
   border-bottom-left-radius: 4px;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
 }
+.assistant-bubble > span:first-child { flex: 1; min-width: 0; }
+
+.assistant-bubble-speak {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--dash-radius-sm);
+  background: transparent;
+  color: var(--dash-text-faint);
+  cursor: pointer;
+  transition: background-color 150ms var(--dash-ease), color 150ms var(--dash-ease);
+}
+.assistant-bubble-speak:hover { background: var(--dash-surface-hover); color: var(--dash-text); }
+.assistant-bubble-speak[aria-pressed="true"] { color: var(--dash-accent-1); }
+.assistant-bubble-speak:focus-visible { outline: 2px solid var(--dash-accent-1); outline-offset: 2px; }
 
 .chat-reasoning {
   padding: 0.9rem;
@@ -1035,6 +1237,16 @@
   line-height: 1.5;
 }
 .chat-composer-pill textarea::placeholder { color: var(--dash-text-faint); }
+
+.composer-mic-button-active {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+  animation: composer-mic-pulse 1.6s ease-in-out infinite;
+}
+@keyframes composer-mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.35); }
+  50% { box-shadow: 0 0 0 4px rgba(248, 113, 113, 0); }
+}
 
 .chat-page-menu {
   position: absolute;
