@@ -37,7 +37,15 @@ const goalSetter = require('./goalSetter');
 const manager = require('./manager');
 const { answerStatusQuery } = require('./statusAssistant');
 const fileEditor = require('./fileEditor');
-const { SECTION_FILES, CONTENT_SECTIONS, LINK_SECTIONS, ALL_SECTIONS, DEFAULT_PALETTE, buildIndexCssFile, buildFileBlock } = require('../shared');
+const { SECTION_FILES, CONTENT_SECTIONS, LINK_SECTIONS, ALL_SECTIONS, DEFAULT_PALETTE, buildIndexCssFile, buildFileBlock, partitionByOwnership } = require('../shared');
+
+// The one write-ownership manifest for this turn — see shared.js's
+// partitionByOwnership. Section Coders (manager.js) always own exactly
+// these 6 paths; everything else is the File Editor agent's (fileEditor.js)
+// to touch. Built once, from the same SECTION_FILES map manager.js/coders/
+// runCoder.js already use, so there's one definition of "the 6 reserved
+// paths," not a second copy that could quietly drift from it.
+const RESERVED_SECTION_PATHS = Object.values(SECTION_FILES);
 
 /**
  * Runs the full pipeline for one turn (a fresh build or one chat edit).
@@ -181,7 +189,20 @@ async function runPipeline({ intent, rawInput, apiKey, model, sectionManifest, p
         sectionFilePaths: Object.values(SECTION_FILES),
       }).then((result) => {
         fileFixSummary = result.summary;
-        for (const f of result.files) {
+        // Structural guarantee, not just the File Editor's own prompt
+        // instruction (or even its own isOwnedBySectionCoder filter, which
+        // this duplicates on purpose — see shared.js's partitionByOwnership
+        // comment): this is the one point where the file-editor's output
+        // actually joins the section Coders' shared `files` array, so the
+        // check belongs here regardless of whether fileEditor.js's own
+        // filter ever has a bug or a future caller forgets to apply it.
+        const { allowed, rejected } = partitionByOwnership(result.files, RESERVED_SECTION_PATHS);
+        if (rejected.length > 0) {
+          console.error(
+            `File Editor agent tried to write ${rejected.length} section-owned path(s), rejected: ${rejected.map((f) => f.path).join(', ')}`
+          );
+        }
+        for (const f of allowed) {
           files.push(f);
           onProgress(buildFileBlock(f.path, f.content));
         }

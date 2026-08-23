@@ -38,6 +38,12 @@ function isSafePath(path) {
 // those 6 files" instruction can't race a Coder's own write for the same
 // path within one turn. Coder output always wins for these; this agent's
 // version of the same path (if it ignored the prompt) is silently dropped.
+// Defense-in-depth, not the only check: pipeline.js's own call site runs
+// shared.js's partitionByOwnership again on this function's return value
+// before merging it into the turn's shared `files` array — that's the
+// actually-authoritative enforcement point (see its comment for why), this
+// one exists so a bad write never even leaves this agent in the first
+// place.
 function isOwnedBySectionCoder(path, sectionFilePaths) {
   return sectionFilePaths.includes(path.replace(/^\/+/, ''));
 }

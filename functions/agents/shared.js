@@ -162,6 +162,35 @@ function buildFileBlock(path, content) {
   return `<file path="${path}">\n${content}\n</file>\n\n`;
 }
 
+// Structural write-ownership guard — see 05-agent-loop/pipeline.js and
+// index.js's aiChat handler for where this is actually enforced. The 6
+// section Coders (dispatched by manager.js) and the File Editor agent
+// (fileEditor.js) run concurrently every turn on the assumption that they
+// touch disjoint files; before this existed, the ONLY thing preventing a
+// collision was a line in fileEditor.js's own system prompt telling the
+// model not to touch the 6 section paths — a prompt is not access control.
+// This is the one real chokepoint both callers filter every file list
+// through: reservedPaths is always Object.values(SECTION_FILES) (the 6
+// fixed section outputs) for the current pipeline shape, but is passed in
+// rather than hardcoded so a future reserved-path source doesn't need a
+// second copy of this function.
+//
+// Returns { allowed, rejected } rather than throwing: a collision here is
+// the same kind of "one thing failed, don't take the whole turn down with
+// it" case manager.js's own per-section try/catch already treats as
+// recoverable — see pipeline.js's call site for how a rejection gets logged
+// and the section Coder's own version of that path always wins.
+function partitionByOwnership(files, reservedPaths) {
+  const allowed = [];
+  const rejected = [];
+  for (const f of files) {
+    const path = (f.path || '').replace(/^\/+/, '');
+    if (reservedPaths.includes(path)) rejected.push(f);
+    else allowed.push(f);
+  }
+  return { allowed, rejected };
+}
+
 // Parses one or more <file path="...">...</file> blocks out of a (possibly
 // prose-prefixed) model response — the wire format 05-agent-loop/
 // fileEditor.js's final answer uses to return several files in one
@@ -197,6 +226,7 @@ module.exports = {
   parseFileBlocks,
   stripFileBlocksFromText,
   pickWireframeId,
+  partitionByOwnership,
   SECTION_FILES,
   CONTENT_SECTIONS,
   LINK_SECTIONS,

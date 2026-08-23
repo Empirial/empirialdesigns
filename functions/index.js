@@ -15,7 +15,7 @@ const fetch = require("node-fetch");
 // pipeline.js itself is cheap to load (no heavy transitive deps beyond
 // node-fetch, already required above), so it's safe to require eagerly.
 const { runPipeline, SECTION_FILES } = require("./agents/05-agent-loop/pipeline");
-const { buildIndexCssFile, clampHue, clampSaturation } = require("./agents/shared");
+const { buildIndexCssFile, clampHue, clampSaturation, partitionByOwnership } = require("./agents/shared");
 const { buildRepoStatusSnapshot } = require("./agents/06-memory-context/repoStatus");
 // Cheap to require eagerly, same as pipeline.js above — preview.js's own
 // heavy deps (esbuild, puppeteer-core, @sparticuz/chromium) are required
@@ -1214,6 +1214,24 @@ exports.aiChat = functions.https.onRequest((req, res) => {
         statusToolCtx,
         onProgress: sendChunk,
       });
+
+      // Outermost write-ownership check, right before anything actually
+      // commits to Firestore/GitHub — see agents/shared.js's
+      // partitionByOwnership and pipeline.js's own call site (which already
+      // filters the File Editor agent's output the same way). Redundant with
+      // that check today by design: this is the literal write boundary
+      // (the only place in the whole request that calls
+      // db.batch()/commitFilesToGithub for these files), so it stays correct
+      // even if a future change adds a third file-producing path into
+      // pipelineResult.files that forgets to filter itself, instead of
+      // silently trusting every upstream caller got it right.
+      const ownershipCheck = partitionByOwnership(pipelineResult.files, Object.values(SECTION_FILES));
+      if (ownershipCheck.rejected.length > 0) {
+        console.error(
+          `aiChat: dropped ${ownershipCheck.rejected.length} file(s) at the commit boundary for writing to a section-owned path: ${ownershipCheck.rejected.map((f) => f.path).join(', ')}`
+        );
+        pipelineResult.files = ownershipCheck.allowed;
+      }
 
       // Persist + sync, right here in the same request — this is the fix for
       // the gap requestRepoSync's own comment describes: chat edits used to
