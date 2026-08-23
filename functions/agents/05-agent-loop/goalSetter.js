@@ -112,6 +112,49 @@ async function run(apiKey, model, { intent, rawInput, sectionManifest }) {
   // pipeline.js's routing depends on this being genuinely empty.
   if (statusQuery) affectedSections = [];
 
+  // Edit-only, model-classified, plus a narrow deterministic net — same
+  // reasoning as the recolor net above: missing this reads to the user as
+  // "I reported a bug and the AI just said generic reassuring things and
+  // changed nothing" (the exact failure mode this classification exists to
+  // close — see docs/AI_BUILDER_ENGINE.md). Kept narrow (an explicit error
+  // report or "missing"/"not found"/"broken" language) rather than a broad
+  // net like the color keywords, since an over-eager net here would run the
+  // File Editor agent (a real extra model call) on requests that never
+  // needed it. Never true for a status question — those are answered, not
+  // fixed.
+  const FILE_FIX_KEYWORDS = /\b(error|crash(?:es|ed)?|broken|not found|missing (?:file|component|import|module)|could not find|module not found|does(?:n't| not) (?:work|load|compile|build))\b/i;
+  const fileFix = intent === 'edit' && !statusQuery
+    && (parsed.file_fix === true || FILE_FIX_KEYWORDS.test(cleanRequest) || FILE_FIX_KEYWORDS.test(rawInput));
+
+  // A map only ever lives in the footer (the only section with a map-embed
+  // slot — see 04-tool-execution/templates.js's injectMapEmbed), so an
+  // explicit request for one always routes there, deterministically, same
+  // reasoning as the SECTION_KEYWORDS net above — this doesn't rely on the
+  // model happening to name "footer" itself. `\bmap\b` (not "sitemap",
+  // which this word boundary excludes) is a deliberate enough word in a
+  // small-business edit request that a plain match is safe here, unlike the
+  // broader FILE_FIX_KEYWORDS net.
+  const MAP_KEYWORDS = /\bmaps?\b/i;
+  if (intent === 'edit' && !statusQuery && !affectedSections.includes('footer')
+    && (MAP_KEYWORDS.test(cleanRequest) || MAP_KEYWORDS.test(rawInput))) {
+    affectedSections = [...affectedSections, 'footer'];
+    // The generic sectionGoals-fill loop above already ran before this net
+    // fires (it only backfills sections the model itself returned) — set
+    // this one directly so the footer coder never gets `goal: undefined`.
+    if (!sectionGoals.footer) sectionGoals.footer = cleanRequest;
+  }
+
+  // A real street address the user actually typed into this message —
+  // never the footer coder's own invented mock one (see
+  // 02-system-prompts/goalSetter.js's contact-details rule and its "Map
+  // requests" rule). Only ever consulted as a map-embed fallback when no
+  // Google Place is linked yet — see coders/runCoder.js's injectMapEmbed
+  // call. Absent/non-string model output just means no fallback available,
+  // not an error.
+  const realAddress = typeof parsed.real_address === 'string' && parsed.real_address.trim()
+    ? parsed.real_address.trim()
+    : null;
+
   return {
     cleanRequest,
     summary: typeof parsed.summary === 'string' ? parsed.summary : cleanRequest,
@@ -121,6 +164,8 @@ async function run(apiKey, model, { intent, rawInput, sectionManifest }) {
     palette,
     recolor,
     statusQuery,
+    fileFix,
+    realAddress,
   };
 }
 

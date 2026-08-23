@@ -1,0 +1,18 @@
+{
+  "goalSetter: create — bakery (warm/amber hue)": true,
+  "goalSetter: create — law firm (navy/teal hue)": true,
+  "goalSetter: create — wellness studio (green hue)": true,
+  "goalSetter: edit — hero-only content change": true,
+  "goalSetter: edit — explicit recolor": true,
+  "goalSetter: edit — greeting is a no-op, not a section edit": true,
+  "goalSetter: edit — status question, not a content edit": true,
+  "goalSetter: edit — build error routes to file_fix": true,
+  "goalSetter: edit — map request routes to footer, no address given": true,
+  "goalSetter: edit — real address in message is captured verbatim": true,
+  "copy: hero": true,
+  "copy: about": true,
+  "copy: services": true,
+  "copy: testimonials": true,
+  "copy: nav": true,
+  "copy: footer": true
+}

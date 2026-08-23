@@ -13,6 +13,14 @@ const STATUS_TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'get_deployment_status',
+      description: "Checks Vercel directly for this site's real current deployment status and live URL, and refreshes the cached snapshot if it had drifted. Use this when current_status.deploymentStatus is BUILDING, ERROR, or missing/stale, and the user is asking whether the site is actually live/published right now — the cached snapshot may not reflect a build that finished after it was last written, or a redeploy triggered outside this app.",
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'get_pagespeed_score',
       description: "Runs a fresh Google PageSpeed Insights check on the site's live URL and returns current performance/accessibility/best-practices/SEO scores (0-100). Only useful once the site is published (has a live URL) — check current_status.published first.",
       parameters: { type: 'object', properties: {}, required: [] },

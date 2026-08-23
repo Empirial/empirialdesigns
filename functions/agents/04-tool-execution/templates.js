@@ -86,19 +86,28 @@ function stamp(templateSource, section, values) {
   });
 }
 
-// Deterministic, non-LLM addition to a stamped footer — a Google Maps embed
-// keyed to a verified Google Place, added right before the footer's closing
-// tag. Only ever called with a real, user-linked place id (see
-// 05-agent-loop/coders/runCoder.js's own comment on why) — never for the
-// footer coder's own AI-invented mock address (see
-// 02-system-prompts/goalSetter.js's contact-details rule): a map pin
-// implies a precision a fabricated address doesn't have, so this only fires
-// once a business has actually confirmed which real place is theirs
-// (functions/index.js's linkGooglePlace). Keyless — Google's classic
-// `/maps?q=` search accepts `place_id:...` directly, no API key required,
-// so this works today even before GOOGLE_PLACES_API_KEY is configured.
-function buildMapEmbedBlock(placeId) {
-  const src = `https://www.google.com/maps?q=place_id:${encodeURIComponent(placeId)}&output=embed`;
+// Deterministic, non-LLM addition to a stamped footer — a real Google Maps
+// embed, added right before the footer's closing tag (or into wireframe 08's
+// own map slot — see below). Never built from the footer coder's own
+// AI-invented mock address (see 02-system-prompts/goalSetter.js's
+// contact-details rule): a map pin implies a precision a fabricated address
+// doesn't have. Two real sources, preferred in this order:
+//   1. A verified Google Place id (functions/index.js's linkGooglePlace) —
+//      the precise, business-confirmed location.
+//   2. A real street address the user actually typed into chat this turn
+//      (05-agent-loop/goalSetter.js's `real_address`, only ever set from the
+//      raw message itself, never invented) — a plain address-search embed,
+//      less precise than a Place pin but still a genuine location, not a
+//      fabricated one.
+// Both are keyless — Google's classic `/maps?q=` search accepts either
+// `place_id:...` or a plain address string, no API key required.
+function resolveMapEmbedSrc(placeId, address) {
+  if (placeId) return `https://www.google.com/maps?q=place_id:${encodeURIComponent(placeId)}&output=embed`;
+  if (address) return `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`;
+  return null;
+}
+
+function buildMapEmbedBlock(src) {
   return `
       <div className="mt-8 overflow-hidden rounded-lg border border-border">
         <iframe
@@ -114,16 +123,50 @@ function buildMapEmbedBlock(placeId) {
 `;
 }
 
+// Same iframe, sized to drop into wireframe 08's own map slot (see below)
+// instead of being appended as a new block.
+function buildMapEmbedSlot(src) {
+  return `<div className="h-48 w-full overflow-hidden rounded-lg border border-border md:h-full">
+              <iframe
+                src="${src}"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                title="Location map"
+              ></iframe>
+            </div>`;
+}
+
+const MAP_SLOT_RE = /\{\/\* MAP_EMBED_SLOT_START \*\/\}[\s\S]*?\{\/\* MAP_EMBED_SLOT_END \*\/\}/;
+const MAP_SLOT_MARKER_LINE_RE = /^[ \t]*\{\/\* MAP_EMBED_SLOT_(?:START|END) \*\/\}\n/gm;
+
 // Every one of the 12 footer wireframes ends with the same `</footer>` (see
 // templates/footer/*.tsx) — inserting right before that closing tag works
 // uniformly across all of them without editing any hand-authored template
 // file, and without needing a new {{TOKEN}} the LLM would have to be told
-// to use correctly.
-function injectMapEmbed(footerContent, placeId) {
-  if (!placeId) return footerContent;
+// to use correctly. Wireframe 08 is the one exception: it already reserves
+// an honest "Map preview unavailable" placeholder for this exact spot
+// (marked with a MAP_EMBED_SLOT_START/END comment pair), so a real map
+// replaces that placeholder in place instead of stacking a second map below
+// it; with no real source available, the marker comments are just stripped
+// and the honest placeholder stays.
+function injectMapEmbed(footerContent, placeId, address) {
+  const src = resolveMapEmbedSrc(placeId, address);
+  const hasSlot = MAP_SLOT_RE.test(footerContent);
+
+  if (!src) {
+    // No real source — leave wireframe 08's honest placeholder as-is, just
+    // drop the now-inert marker comment lines from the shipped output.
+    return hasSlot ? footerContent.replace(MAP_SLOT_MARKER_LINE_RE, '') : footerContent;
+  }
+
+  if (hasSlot) return footerContent.replace(MAP_SLOT_RE, buildMapEmbedSlot(src));
+
   const closeIdx = footerContent.lastIndexOf('</footer>');
   if (closeIdx === -1) return footerContent;
-  return footerContent.slice(0, closeIdx) + buildMapEmbedBlock(placeId) + '    ' + footerContent.slice(closeIdx);
+  return footerContent.slice(0, closeIdx) + buildMapEmbedBlock(src) + '    ' + footerContent.slice(closeIdx);
 }
 
 module.exports = { loadTemplate, extractTokens, isAssetToken, assetFallback, stamp, injectMapEmbed };

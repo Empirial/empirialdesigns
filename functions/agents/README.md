@@ -36,12 +36,16 @@ response gets parsed or dispatched.
 ## 3 — Tool definitions
 [`03-tool-definitions/statusTools.js`](./03-tool-definitions/statusTools.js)
 
-Real function-calling now exists, scoped deliberately narrow: 3 read-only
-tools (`get_pagespeed_score`, `get_google_reviews`, `get_search_performance`)
-the status assistant (layer 5's `statusAssistant.js`) can call when a chat
-question needs a fresher number than the cached Firestore snapshot (layer
-6). None of them can publish, post, or connect anything — see "Trigger
-scope" below for why actions stay off this list. The Coders and Goal Setter
+Real function-calling now exists, scoped deliberately narrow: 4 read-only
+tools (`get_deployment_status`, `get_pagespeed_score`, `get_google_reviews`,
+`get_search_performance`) the status assistant (layer 5's
+`statusAssistant.js`) can call when a chat question needs a fresher number
+than the cached Firestore snapshot (layer 6) — `get_deployment_status`
+checks Vercel directly and self-heals the cached status the same way
+`getDeploymentStatus` (`index.js`) does for the Growth page and the
+builder's own header, so "is this live?" never trusts a stale BUILDING/
+ERROR reading. None of them can publish, post, or connect anything — see
+"Trigger scope" below for why actions stay off this list. The Coders and Goal Setter
 still use a fixed JSON *response shape* instead of real tool-calling (Goal
 Setter's `{affected_sections, section_goals, style, ...}`, each Coder's
 `{TOKEN: "value", ...}`) — that's a contract the model fills out once, not
@@ -60,14 +64,21 @@ Two unrelated things execute here:
   copy for `{{TOKEN}}` placeholders; this file loads the chosen template and
   deterministically stamps that copy in. The model never writes or touches
   code.
-- `statusTools.js` — the execution side of layer 3's 3 tools. Thin wrappers
+- `statusTools.js` — the execution side of layer 3's 4 tools. Thin wrappers
   over the existing `functions/integrations/**` modules (same code the
-  dashboard's own SEO/Growth panels call), so a chat answer and a dashboard
-  number are always computed the same way.
+  dashboard's own SEO/Growth panels call — plus, for `get_deployment_status`,
+  the same Vercel read-and-self-heal logic `index.js`'s own
+  `getDeploymentStatus` uses), so a chat answer and a dashboard number are
+  always computed the same way.
 - `templates.js`'s `injectMapEmbed()` — a deterministic (non-LLM) addition
-  to a stamped footer: a Google Maps embed keyed to a verified linked Place
-  id (never for the footer coder's own invented mock address — see its own
-  comment). `coders/runCoder.js` calls it after `stamp()`, footer-only.
+  to a stamped footer: a real Google Maps embed keyed to a verified linked
+  Place id, or (with no Place linked yet) a plain address-search embed built
+  from a real street address the user typed into that chat turn
+  (`goalSetter.js`'s `real_address`) — never the footer coder's own invented
+  mock address either way (see its own comment). An explicit "add a map"
+  request routes to the footer deterministically (`goalSetter.js`'s
+  `MAP_KEYWORDS` net) even if the model names a different section.
+  `coders/runCoder.js` calls `injectMapEmbed` after `stamp()`, footer-only.
   `functions/integrations/google/analytics.js`'s GA4 injection is a sibling
   of this same "deterministic, zero LLM calls" pattern, but lives outside
   `agents/` entirely — it's not part of the section-editing pipeline at all,
@@ -172,13 +183,19 @@ since there's no live chat UI watching a fresh build happen turn-by-turn.
 ## 10 — Evaluation and observability
 [`10-evaluation-observability/`](./10-evaluation-observability/)
 
-Real gap, not just an unmapped layer: there is no eval suite (no fixed set
-of test prompts run against the pipeline to catch a regression before it
-ships) and no structured observability beyond `console.error` calls
-scattered through `index.js` and each agent file (visible in Cloud
-Functions logs, not aggregated anywhere — no per-run cost/latency/token
-tracking, no dashboard). See that folder's own note for what would need to
-exist.
+`run-eval.js` — a fixed set of test prompts (`fixtures.js`) run against the
+real Goal Setter and Coders, checked against expected classification shapes
+and against `checks.js`'s copy-tell patterns (em dashes, hollow taglines,
+buzzword stacking, decorative emoji, bare generic CTAs). `cd functions &&
+npm run eval` (needs `DEEPSEEK_API_KEY`). Catches a system-prompt regression
+before it ships, without a human eyeballing every change — see that
+folder's README for exactly what's covered.
+
+Structured observability is still a real gap: no per-run cost/latency/token
+tracking beyond `console.error` calls scattered through `index.js` and each
+agent file (visible in Cloud Functions logs, not aggregated anywhere, no
+dashboard). See that folder's own note for what building this out would
+need.
 
 ## `shared.js` — not a layer
 

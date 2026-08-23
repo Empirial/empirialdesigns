@@ -34,10 +34,15 @@ const CODER_CONFIG = {
  *   if any. Only ever consulted by the footer coder (see coders/runCoder.js's
  *   injectMapEmbed call) to add a real map embed — every other section
  *   ignores this entirely.
+ * @param {string} [opts.realAddress] - a real street address the user typed
+ *   into this turn's chat message (goalSetter.js's real_address field), if
+ *   any. Same footer-only map-embed use as googlePlaceId above — a fallback
+ *   for a business that hasn't linked a Google Place yet but did give a
+ *   real address; never the footer coder's own invented mock one.
  * @param {(section: string) => Promise<string>} opts.getFileContent
  * @param {(chunk: string) => void} opts.onProgress
  */
-async function dispatch({ intent, apiKey, model, goalSetter, sectionManifest, style, realReviews, googlePlaceId, getFileContent, onProgress }) {
+async function dispatch({ intent, apiKey, model, goalSetter, sectionManifest, style, realReviews, googlePlaceId, realAddress, getFileContent, onProgress }) {
   const files = [];
   const failedSections = [];
   const priorById = new Map((sectionManifest || []).map((m) => [m.id, m]));
@@ -61,12 +66,18 @@ async function dispatch({ intent, apiKey, model, goalSetter, sectionManifest, st
         style,
         realReviews,
         googlePlaceId,
+        realAddress,
       });
       files.push({ ...result, wireframeId });
       onProgress(buildFileBlock(result.path, result.content));
     } catch (error) {
       failedSections.push(section);
-      onProgress(`[Note: the ${section} update failed — ask me to retry it. (${error.message})]\n\n`);
+      // The raw error (a provider error body, a JSON-parse failure, etc.) is
+      // logged for debugging but never shown to the user — it's internal
+      // detail that reads as noise, not an answer, in a chat reply. See
+      // 08-error-handling/README.md.
+      console.error(`Coder failed for section "${section}":`, error);
+      onProgress(`I hit a snag updating the ${section} section — go ahead and ask me to try that again.\n\n`);
     }
   }
 

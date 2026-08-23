@@ -10,8 +10,54 @@
 // request/response shape, so this was the only file that needed to change
 // when the switch happened.
 const fetch = require('node-fetch');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
+
+// Eval recording/replay seam — see
+// ../10-evaluation-observability/run-eval.js's --mode flag. This is the one
+// place every agent's LLM call actually goes through (see this file's own
+// header comment), so it's the cleanest place to intercept a call for the
+// free replay tier without threading a fixture id through goalSetter.js /
+// runCoder.js / the pipeline just for eval's sake. Off (null) in every real
+// request path — only run-eval.js ever calls setEvalMode.
+let evalMode = null; // null | 'record' | 'replay'
+let evalRecordingsDir = null;
+
+function setEvalMode(mode, recordingsDir) {
+  evalMode = mode;
+  evalRecordingsDir = recordingsDir;
+}
+
+// The recording key is a hash of exactly what was sent, not a fixture name —
+// fixtures.js already gives each case a fixed, deterministic input, so the
+// same call always hashes to the same key whether run-eval.js is recording
+// or replaying, with no id-plumbing needed anywhere else in the pipeline.
+function recordingKeyFor(payload) {
+  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex').slice(0, 20);
+}
+
+function recordingPathFor(key) {
+  return path.join(evalRecordingsDir, `${key}.json`);
+}
+
+function readRecording(key, payload) {
+  const file = recordingPathFor(key);
+  if (!fs.existsSync(file)) {
+    throw new Error(
+      `No recording for this call (key ${key}) — run "npm run eval:record" after any prompt change ` +
+      `before replaying. Payload was: ${JSON.stringify(payload).slice(0, 200)}...`
+    );
+  }
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+function writeRecording(key, payload, result) {
+  fs.mkdirSync(evalRecordingsDir, { recursive: true });
+  fs.writeFileSync(recordingPathFor(key), JSON.stringify({ payload, result }, null, 2));
+}
 
 // Sampling profiles — every agent used to share one fixed temperature:0.7
 // regardless of what kind of call it was. Split into two, since the two
@@ -37,6 +83,9 @@ const SAMPLING_PROFILES = {
 };
 
 async function callAgent(apiKey, model, systemPrompt, userContent, sampling = SAMPLING_PROFILES.decision) {
+  const key = evalMode ? recordingKeyFor({ kind: 'callAgent', model, systemPrompt, userContent, sampling }) : null;
+  if (evalMode === 'replay') return readRecording(key, { systemPrompt, userContent }).result;
+
   const res = await fetch(DEEPSEEK_URL, {
     method: 'POST',
     headers: {
@@ -62,6 +111,7 @@ async function callAgent(apiKey, model, systemPrompt, userContent, sampling = SA
   const data = await res.json();
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('Agent call returned no content');
+  if (evalMode === 'record') writeRecording(key, { systemPrompt, userContent }, content);
   return content;
 }
 
@@ -75,6 +125,13 @@ async function callAgent(apiKey, model, systemPrompt, userContent, sampling = SA
 // (Goal Setter, the Coders) has a fixed one-shot JSON contract and has no
 // use for a tool loop, so they stay on the simpler callAgent above.
 async function callAgentWithTools(apiKey, model, messages, { tools, sampling = SAMPLING_PROFILES.decision } = {}) {
+  // Keyed on the whole transcript (not just the latest message) — a
+  // tool-calling loop appends assistant/tool messages round by round, so the
+  // 2nd/3rd call in one loop has a different, longer `messages` than the
+  // 1st; each round needs its own recording.
+  const key = evalMode ? recordingKeyFor({ kind: 'callAgentWithTools', model, messages, tools, sampling }) : null;
+  if (evalMode === 'replay') return readRecording(key, { messages }).result;
+
   const res = await fetch(DEEPSEEK_URL, {
     method: 'POST',
     headers: {
@@ -98,7 +155,8 @@ async function callAgentWithTools(apiKey, model, messages, { tools, sampling = S
   const data = await res.json();
   const message = data.choices?.[0]?.message;
   if (!message) throw new Error('Agent call returned no message');
+  if (evalMode === 'record') writeRecording(key, { messages }, message);
   return message;
 }
 
-module.exports = { callAgent, callAgentWithTools, SAMPLING_PROFILES, DEEPSEEK_URL };
+module.exports = { callAgent, callAgentWithTools, setEvalMode, SAMPLING_PROFILES, DEEPSEEK_URL };

@@ -65,12 +65,14 @@ export default function Footer() {
           </div>
 
           <div>
+            {/* MAP_EMBED_SLOT_START */}
             <div className="flex h-48 w-full items-center justify-center rounded-lg border border-border bg-muted md:h-full">
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <MapPinned className="h-8 w-8" aria-hidden="true" />
                 <span className="text-sm">Map preview unavailable</span>
               </div>
             </div>
+            {/* MAP_EMBED_SLOT_END */}
             <p className="mt-3 text-center text-sm text-muted-foreground md:text-left">
               {{ADDRESS}}
             </p>

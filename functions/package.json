@@ -7,7 +7,10 @@
         "shell": "firebase functions:shell",
         "start": "npm run shell",
         "deploy": "cross-env FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only functions",
-        "logs": "firebase functions:log"
+        "logs": "firebase functions:log",
+        "eval": "node agents/10-evaluation-observability/run-eval.js",
+        "eval:record": "node agents/10-evaluation-observability/run-eval.js --mode=record",
+        "eval:replay": "node agents/10-evaluation-observability/run-eval.js --mode=replay"
     },
     "engines": {
         "node": "20"

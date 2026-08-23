@@ -75,7 +75,7 @@ function applyRealReviews(values, realReviews) {
   return overridden;
 }
 
-async function runCoder(apiKey, model, { section, config, goal, currentContent, manifestContext, wireframeId, isNewLayout, style, realReviews, googlePlaceId }) {
+async function runCoder(apiKey, model, { section, config, goal, currentContent, manifestContext, wireframeId, isNewLayout, style, realReviews, googlePlaceId, realAddress }) {
   const filePath = SECTION_FILES[section];
   const templateSource = loadTemplate(section, wireframeId);
   const contentTokens = extractTokens(templateSource).filter((t) => !isAssetToken(t) && t !== 'COPYRIGHT_YEAR');
@@ -86,10 +86,12 @@ async function runCoder(apiKey, model, { section, config, goal, currentContent, 
   if (section === 'testimonials') values = applyRealReviews(values, realReviews);
 
   let content = stamp(templateSource, section, values);
-  // Map embed: footer-only, and only when a real Google Place is linked —
-  // see 04-tool-execution/templates.js's injectMapEmbed for why this never
-  // fires for the coder's own invented mock address.
-  if (section === 'footer') content = injectMapEmbed(content, googlePlaceId);
+  // Map embed: footer-only, and only from a real source — a linked Google
+  // Place (preferred) or a real address the user actually typed this turn
+  // (goalSetter.js's realAddress) — see 04-tool-execution/templates.js's
+  // injectMapEmbed for why this never fires for the coder's own invented
+  // mock address.
+  if (section === 'footer') content = injectMapEmbed(content, googlePlaceId, realAddress);
 
   return { section, path: filePath, content: stripCodeFences(content) };
 }

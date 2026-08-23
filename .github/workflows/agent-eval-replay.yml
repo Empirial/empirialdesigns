@@ -1,0 +1,31 @@
+name: Agent pipeline — replay eval
+
+# Free, no-network tier of functions/agents/10-evaluation-observability —
+# see that folder's README.md. Runs on every push/PR that touches the agent
+# pipeline, using the recordings/ committed alongside the fixtures instead of
+# calling DeepSeek, so it costs nothing and needs no secret. Catches a
+# regression in downstream parsing/classification code (goalSetter.js,
+# shared.js's extractJson, checks.js) on a fixed input — it cannot catch the
+# model itself drifting; that's what the live tier (`npm run eval`, run by
+# hand before shipping a system-prompt change) is for.
+on:
+  push:
+    paths:
+      - 'functions/agents/**'
+  pull_request:
+    paths:
+      - 'functions/agents/**'
+
+jobs:
+  replay-eval:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run eval:replay

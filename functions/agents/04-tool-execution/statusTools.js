@@ -16,6 +16,30 @@
 const { runPageSpeed } = require('../../integrations/google/pagespeed');
 const { getPlaceReviews } = require('../../integrations/google/places');
 const { getSearchAnalytics } = require('../../integrations/google/searchConsole');
+const { getDeployment, mapReadyState } = require('../../integrations/vercel/publish');
+
+// Same read-refresh-and-self-heal logic as functions/index.js's own
+// getDeploymentStatus Cloud Function (the one BuilderPage.tsx/Growth.tsx
+// call on page load) — duplicated rather than shared because index.js
+// isn't a module this agent pipeline imports (see this file's own header
+// comment on why ctx is passed in rather than admin re-initialized here).
+async function getDeploymentStatusLive(ctx) {
+  if (!ctx.repo.vercel_deployment_id) return { status: ctx.repo.vercel_deployment_status || 'NOT_CONNECTED' };
+  const deployment = await getDeployment(ctx.repo.vercel_deployment_id);
+  const status = mapReadyState(deployment.readyState);
+  const productionUrl = deployment.url ? `https://${deployment.url}` : ctx.repo.vercel_production_url;
+  if (status !== ctx.repo.vercel_deployment_status) {
+    try {
+      await ctx.db.collection('user_repos').doc(ctx.repoId).set({
+        vercel_deployment_status: status,
+        vercel_production_url: status === 'READY' ? productionUrl : ctx.repo.vercel_production_url,
+      }, { merge: true });
+    } catch (e) {
+      console.error('getDeploymentStatusLive: failed to cache result:', e);
+    }
+  }
+  return { status, url: productionUrl };
+}
 
 async function getPagespeedScore(ctx) {
   const liveUrl = ctx.repo.vercel_production_url || ctx.repo.deploy_url;
@@ -46,6 +70,7 @@ async function getSearchPerformance(ctx) {
 }
 
 const EXECUTORS = {
+  get_deployment_status: getDeploymentStatusLive,
   get_pagespeed_score: getPagespeedScore,
   get_google_reviews: getGoogleReviews,
   get_search_performance: getSearchPerformance,

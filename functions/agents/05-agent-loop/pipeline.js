@@ -36,6 +36,7 @@
 const goalSetter = require('./goalSetter');
 const manager = require('./manager');
 const { answerStatusQuery } = require('./statusAssistant');
+const fileEditor = require('./fileEditor');
 const { SECTION_FILES, CONTENT_SECTIONS, LINK_SECTIONS, ALL_SECTIONS, DEFAULT_PALETTE, buildIndexCssFile, buildFileBlock } = require('../shared');
 
 /**
@@ -69,9 +70,21 @@ const { SECTION_FILES, CONTENT_SECTIONS, LINK_SECTIONS, ALL_SECTIONS, DEFAULT_PA
  * @param {string} [opts.googlePlaceId] - the repo's linked Google Place id,
  *   if any. Passed straight through to Manager; only the footer coder ever
  *   consults it, to add a real map embed (see coders/runCoder.js).
+ * runPipeline itself also reads goals.realAddress (a real street address the
+ * user typed into this turn's message — see goalSetter.js) and passes it to
+ * Manager the same way, as a fallback map-embed source for a business that
+ * hasn't linked a Google Place yet.
  * @param {(section: string) => Promise<string>} opts.getFileContent - async
  *   lookup for a section's current file content; return 'none — new file'
  *   for a section that doesn't exist yet.
+ * @param {() => Promise<string[]>} [opts.listProjectFiles] - lists every
+ *   real file path currently in the project (not just the 6 sections) —
+ *   only needed when Goal Setter classifies the turn as a file_fix (see
+ *   fileEditor.js); undefined on 'create' (a fresh build has no existing
+ *   tree to fix yet) is fine, that branch is simply never reached then.
+ * @param {(path: string) => Promise<string>} [opts.getProjectFileContent] -
+ *   one file's current content by arbitrary path (unlike getFileContent
+ *   above, not limited to the 6 sections) — same file_fix-only condition.
  * @param {object} [opts.statusSnapshot] - the repo's cached Publish/SEO/
  *   Growth status (06-memory-context/repoStatus.js's buildRepoStatusSnapshot),
  *   if any. Only consulted when Goal Setter classifies the message as a
@@ -83,7 +96,7 @@ const { SECTION_FILES, CONTENT_SECTIONS, LINK_SECTIONS, ALL_SECTIONS, DEFAULT_PA
  * @param {(chunk: string) => void} [opts.onProgress] - called with plain
  *   text or `<file>` block chunks as they become available, in order.
  */
-async function runPipeline({ intent, rawInput, apiKey, model, sectionManifest, priorStyle, priorPalette, realReviews, googlePlaceId, getFileContent, statusSnapshot, statusToolCtx, onProgress = () => {} }) {
+async function runPipeline({ intent, rawInput, apiKey, model, sectionManifest, priorStyle, priorPalette, realReviews, googlePlaceId, getFileContent, listProjectFiles, getProjectFileContent, statusSnapshot, statusToolCtx, onProgress = () => {} }) {
   const goals = await goalSetter.run(apiKey, model, { intent, rawInput, sectionManifest });
   const style = intent === 'create' ? goals.style : (priorStyle || 'default');
   // Recolor: an edit Goal Setter identified as an explicit request to change
@@ -95,11 +108,12 @@ async function runPipeline({ intent, rawInput, apiKey, model, sectionManifest, p
   const recolor = intent === 'edit' && goals.recolor;
   const palette = intent === 'create' || recolor ? goals.palette : (priorPalette || DEFAULT_PALETTE);
 
-  // A pure recolor ("make it more blue", nothing else) has no affected
-  // sections and would otherwise hit the no-op/clarification path below —
-  // recolor is real work even with zero section changes, so it must bypass
-  // that early return.
-  if (intent === 'edit' && goals.affectedSections.length === 0 && !recolor) {
+  // A pure recolor ("make it more blue", nothing else) or a pure file_fix
+  // (a bug report that names no section) has no affected sections and would
+  // otherwise hit the no-op/clarification path below — both are real work
+  // even with zero section changes, so they must bypass that early return.
+  const fileFix = intent === 'edit' && goals.fileFix && listProjectFiles && getProjectFileContent;
+  if (intent === 'edit' && goals.affectedSections.length === 0 && !recolor && !fileFix) {
     // Status query: real data, not a guess — Goal Setter's own `summary` is
     // deliberately just a holding line here ("Let me check that."), never
     // trusted as the actual answer (see its system prompt). Route to the
@@ -127,21 +141,61 @@ async function runPipeline({ intent, rawInput, apiKey, model, sectionManifest, p
   let files = [];
   let failedSections = [];
   let newSectionManifest = sectionManifest || [];
+  let fileFixSummary = null;
+
+  // Section Coders and the File Editor agent touch disjoint files (the File
+  // Editor is barred from ever writing one of the 6 section paths — see
+  // fileEditor.js's isOwnedBySectionCoder), so running them concurrently
+  // rather than sequentially is safe and saves real wall-clock time on a
+  // turn that needs both (e.g. "fix this crash AND update the hero text").
+  const tasks = [];
 
   if (goals.affectedSections.length > 0) {
-    ({ files, failedSections, newSectionManifest } = await manager.dispatch({
-      intent,
-      apiKey,
-      model,
-      goalSetter: goals,
-      sectionManifest,
-      style,
-      realReviews,
-      googlePlaceId,
-      getFileContent,
-      onProgress,
-    }));
+    tasks.push(
+      manager.dispatch({
+        intent,
+        apiKey,
+        model,
+        goalSetter: goals,
+        sectionManifest,
+        style,
+        realReviews,
+        googlePlaceId,
+        realAddress: goals.realAddress,
+        getFileContent,
+        onProgress,
+      }).then((result) => {
+        files.push(...result.files);
+        failedSections = result.failedSections;
+        newSectionManifest = result.newSectionManifest;
+      })
+    );
   }
+
+  if (fileFix) {
+    tasks.push(
+      fileEditor.run(apiKey, model, {
+        rawInput: goals.cleanRequest,
+        listFiles: listProjectFiles,
+        getFileContent: getProjectFileContent,
+        sectionFilePaths: Object.values(SECTION_FILES),
+      }).then((result) => {
+        fileFixSummary = result.summary;
+        for (const f of result.files) {
+          files.push(f);
+          onProgress(buildFileBlock(f.path, f.content));
+        }
+        onProgress(`${result.summary}\n\n`);
+      }).catch((error) => {
+        // Same reasoning as manager.js's runOne catch: log the real error,
+        // never echo it into the chat reply itself.
+        console.error('File Editor agent failed:', error);
+        onProgress(`I tried to look into that but hit an error myself — go ahead and ask me to try again.\n\n`);
+      })
+    );
+  }
+
+  await Promise.all(tasks);
 
   if (recolor) {
     const cssContent = buildIndexCssFile(palette);
@@ -150,7 +204,13 @@ async function runPipeline({ intent, rawInput, apiKey, model, sectionManifest, p
   }
 
   return {
-    summary: goals.summary,
+    // fileFixSummary appended (not replacing goals.summary): goals.summary
+    // already streamed first above and is what a section-only or recolor-
+    // only turn's commit message/history entry has always used; a file_fix
+    // turn adds its own after-the-fact summary (the File Editor only knows
+    // what it actually did once it's done, unlike Goal Setter's up-front
+    // one-liner) rather than overwriting it.
+    summary: fileFixSummary ? `${goals.summary}\n\n${fileFixSummary}` : goals.summary,
     affectedSections: goals.affectedSections,
     files,
     failedSections,

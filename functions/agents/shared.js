@@ -162,10 +162,40 @@ function buildFileBlock(path, content) {
   return `<file path="${path}">\n${content}\n</file>\n\n`;
 }
 
+// Parses one or more <file path="...">...</file> blocks out of a (possibly
+// prose-prefixed) model response — the wire format 05-agent-loop/
+// fileEditor.js's final answer uses to return several files in one
+// response, mirroring the client's parseAiFileBlocks
+// (src/features/builder/lib/aiChat.ts) since both sides need to agree on
+// the same tag shape. The 6 section Coders never need this themselves: each
+// one returns exactly one file's raw content, wrapped separately by
+// buildFileBlock above — only the File Editor asks a model to emit several
+// of these in a single response.
+function parseFileBlocks(text) {
+  const fileRegex = /<file\s+path="([^"]+)">([\s\S]*?)<\/file>/g;
+  const files = [];
+  let match;
+  while ((match = fileRegex.exec(text)) !== null) {
+    const path = match[1].trim();
+    const content = match[2].trim();
+    if (path && content) files.push({ path, content });
+  }
+  return files;
+}
+
+// The prose part of a File Editor response — everything outside its <file>
+// blocks, trimmed. Mirrors the client's stripFileBlocksForDisplay, for the
+// same reason: the raw file content was never meant for the chat bubble.
+function stripFileBlocksFromText(text) {
+  return text.replace(/<file\s+path="[^"]*">[\s\S]*?<\/file>/g, '').trim();
+}
+
 module.exports = {
   extractJson,
   stripCodeFences,
   buildFileBlock,
+  parseFileBlocks,
+  stripFileBlocksFromText,
   pickWireframeId,
   SECTION_FILES,
   CONTENT_SECTIONS,
