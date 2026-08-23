@@ -45,7 +45,12 @@ async function writeContent(apiKey, model, { section, config, contentTokens, goa
 
   const system = buildSystemPrompt({ section, wireframeId, wireframeDescription, goal, editNote, manifestNote, extra, voice, contentTokens });
 
-  const raw = await callAgent(apiKey, model, system, 'Write the content now.', SAMPLING_PROFILES.copy);
+  // jsonMode: true — same guarantee/limits as goalSetter.js's call (see
+  // 01-model/provider.js's callAgent comment): valid JSON syntax is
+  // guaranteed, the exact set of contentTokens keys is not, so extractJson's
+  // fallback (blank string per token) stays the real safety net for a
+  // response missing a field the template actually needs.
+  const raw = await callAgent(apiKey, model, system, 'Write the content now.', SAMPLING_PROFILES.copy, true);
   const fallback = {};
   for (const t of contentTokens) fallback[t] = '';
   return extractJson(raw, fallback);

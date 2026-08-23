@@ -24,7 +24,13 @@ async function run(apiKey, model, { intent, rawInput, sectionManifest }) {
     current_sections: sectionManifest && sectionManifest.length ? sectionManifest : undefined,
   });
 
-  const raw = await callAgent(apiKey, model, system, userContent, SAMPLING_PROFILES.decision);
+  // jsonMode: true — see 01-model/provider.js's callAgent comment. Guarantees
+  // syntactically valid JSON from DeepSeek (no prose wrapper, no ```fence);
+  // does NOT validate which keys came back or that affected_sections only
+  // names real section ids, which is exactly why the keyword nets below
+  // still exist — they catch a wrong semantic classification, not a JSON
+  // parse failure.
+  const raw = await callAgent(apiKey, model, system, userContent, SAMPLING_PROFILES.decision, true);
   const fallback = { clean_request: rawInput, summary: rawInput, affected_sections: [], section_goals: {} };
   const parsed = extractJson(raw, fallback);
 

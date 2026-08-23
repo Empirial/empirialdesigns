@@ -73,6 +73,22 @@ that's expected — the hash changed because the prompt did. Run
 live results still look right, then commit the recordings alongside the
 prompt change.
 
+### JSON syntax vs. classification correctness
+
+Goal Setter's and the Coders' calls now set DeepSeek's `response_format:
+{type: 'json_object'}` (see `01-model/provider.js`'s `callAgent` — DeepSeek's
+own docs confirm only this plain JSON mode is supported, not OpenAI's newer
+`json_schema`/structured-outputs mode with enum/required-field
+enforcement). That guarantees the response is syntactically valid JSON —
+`extractJson`'s brace-slicing fallback should now be a rare defensive path,
+not the common one — but it does **not** validate which keys came back or
+that a field like `affected_sections` only contains real section ids.
+Concretely: `goalSetter.js`'s deterministic keyword nets (recolor, file_fix,
+section-name, map) are still load-bearing and stay — they catch the model's
+own semantic misclassification, which no `response_format` value DeepSeek
+exposes today can enforce. Re-recorded after this change; if DeepSeek adds
+real schema enforcement later, re-evaluate those nets then, not before.
+
 ### Baseline diff
 
 Every mode ends by diffing this run's per-case PASS/FAIL against

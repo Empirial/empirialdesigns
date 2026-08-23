@@ -82,8 +82,28 @@ const SAMPLING_PROFILES = {
   copy: { temperature: 0.8, top_p: 0.95, frequency_penalty: 0.3, presence_penalty: 0.1 },
 };
 
-async function callAgent(apiKey, model, systemPrompt, userContent, sampling = SAMPLING_PROFILES.decision) {
-  const key = evalMode ? recordingKeyFor({ kind: 'callAgent', model, systemPrompt, userContent, sampling }) : null;
+// jsonMode: pass true for a caller whose contract is "the whole response IS
+// one JSON object" (Goal Setter, the 6 Coders) — sets response_format:
+// {type: 'json_object'} on the wire. DeepSeek's API (confirmed against its
+// own docs, api-docs.deepseek.com/guides/json_mode) only supports this
+// plain json_object mode, NOT OpenAI's newer json_schema/structured-outputs
+// mode — there is no enum/required-field/type enforcement available here,
+// only a guarantee that the response is syntactically valid JSON (no prose
+// wrapper, no ```fence, no truncated object). That's a real, useful
+// guarantee — extractJson (../shared.js) no longer needs its brace-slicing
+// fallback for the common case — but it does NOT validate which keys are
+// present or that e.g. affected_sections only contains real section ids.
+// Concretely: this cannot replace goalSetter.js's deterministic keyword
+// nets (recolor/file_fix/section-name/map) — those exist to catch the
+// model's own SEMANTIC classification judgment being wrong, not its JSON
+// syntax; json_object mode fixes the latter, not the former, and no
+// response_format value DeepSeek exposes today can enforce the former. Per
+// DeepSeek's own docs, the word "json" must appear somewhere in the prompt
+// when this is set — every caller here already says "Respond with JSON
+// only", so no prompt change was needed to satisfy that.
+async function callAgent(apiKey, model, systemPrompt, userContent, sampling = SAMPLING_PROFILES.decision, jsonMode = false) {
+  const responseFormat = jsonMode ? { type: 'json_object' } : undefined;
+  const key = evalMode ? recordingKeyFor({ kind: 'callAgent', model, systemPrompt, userContent, sampling, responseFormat }) : null;
   if (evalMode === 'replay') return readRecording(key, { systemPrompt, userContent }).result;
 
   const res = await fetch(DEEPSEEK_URL, {
@@ -102,6 +122,7 @@ async function callAgent(apiKey, model, systemPrompt, userContent, sampling = SA
       top_p: sampling.top_p,
       frequency_penalty: sampling.frequency_penalty,
       presence_penalty: sampling.presence_penalty,
+      ...(responseFormat ? { response_format: responseFormat } : {}),
     }),
   });
   if (!res.ok) {
