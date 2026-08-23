@@ -15,13 +15,17 @@ const { callAgent, SAMPLING_PROFILES } = require('../01-model/provider');
 const { extractJson, ALL_SECTIONS, STYLES, clampHue, clampSaturation } = require('../shared');
 const { buildSystemPrompt } = require('../02-system-prompts/goalSetter');
 
-async function run(apiKey, model, { intent, rawInput, sectionManifest }) {
+async function run(apiKey, model, { intent, rawInput, sectionManifest, businessProfile }) {
   const system = buildSystemPrompt();
 
   const userContent = JSON.stringify({
     intent,
     raw_input: rawInput,
     current_sections: sectionManifest && sectionManifest.length ? sectionManifest : undefined,
+    // Persistent business context (06-memory-context/businessProfile.js) —
+    // undefined on a repo's very first turn (no profile built yet), which
+    // the prompt already treats the same as "nothing known yet."
+    business_profile: businessProfile || undefined,
   });
 
   // jsonMode: true — see 01-model/provider.js's callAgent comment. Guarantees
@@ -161,6 +165,27 @@ async function run(apiKey, model, { intent, rawInput, sectionManifest }) {
     ? parsed.real_address.trim()
     : null;
 
+  // Business profile (06-memory-context/businessProfile.js merges/builds
+  // these — this file only extracts the model's raw fields, same division
+  // as style/palette above). Create-only fields; edit-only profileUpdates —
+  // pipeline.js picks the right one for the intent, exactly like it already
+  // does for style/palette.
+  const profile = intent === 'create' ? {
+    businessType: typeof parsed.business_type === 'string' ? parsed.business_type : null,
+    audience: typeof parsed.audience === 'string' ? parsed.audience : null,
+    toneKeywords: Array.isArray(parsed.tone_keywords) ? parsed.tone_keywords : [],
+    keyFacts: Array.isArray(parsed.key_facts) ? parsed.key_facts : [],
+  } : null;
+
+  const profileUpdates = intent === 'edit' && parsed.profile_updates && typeof parsed.profile_updates === 'object'
+    ? {
+      businessType: typeof parsed.profile_updates.business_type === 'string' ? parsed.profile_updates.business_type : undefined,
+      audience: typeof parsed.profile_updates.audience === 'string' ? parsed.profile_updates.audience : undefined,
+      toneKeywords: Array.isArray(parsed.profile_updates.tone_keywords) ? parsed.profile_updates.tone_keywords : undefined,
+      keyFactsAdd: Array.isArray(parsed.profile_updates.key_facts_add) ? parsed.profile_updates.key_facts_add : undefined,
+    }
+    : null;
+
   return {
     cleanRequest,
     summary: typeof parsed.summary === 'string' ? parsed.summary : cleanRequest,
@@ -172,6 +197,8 @@ async function run(apiKey, model, { intent, rawInput, sectionManifest }) {
     statusQuery,
     fileFix,
     realAddress,
+    profile,
+    profileUpdates,
   };
 }
 

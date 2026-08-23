@@ -39,10 +39,17 @@ const CODER_CONFIG = {
  *   any. Same footer-only map-embed use as googlePlaceId above — a fallback
  *   for a business that hasn't linked a Google Place yet but did give a
  *   real address; never the footer coder's own invented mock one.
+ * @param {{businessType:?string,audience:?string,toneKeywords:string[],keyFacts:string[]}} [opts.businessProfile] -
+ *   the persistent business-context doc (06-memory-context/businessProfile.js),
+ *   already built/merged by pipeline.js for this turn. Passed to every
+ *   dispatched Coder (see coders/runCoder.js) so a section's copy never
+ *   contradicts a stable fact or drifts from the locked tone — unlike
+ *   realReviews/googlePlaceId, which only one section (testimonials/footer)
+ *   ever consults, every Coder reads this.
  * @param {(section: string) => Promise<string>} opts.getFileContent
  * @param {(chunk: string) => void} opts.onProgress
  */
-async function dispatch({ intent, apiKey, model, goalSetter, sectionManifest, style, realReviews, googlePlaceId, realAddress, getFileContent, onProgress }) {
+async function dispatch({ intent, apiKey, model, goalSetter, sectionManifest, style, realReviews, googlePlaceId, realAddress, businessProfile, getFileContent, onProgress }) {
   const files = [];
   const failedSections = [];
   const priorById = new Map((sectionManifest || []).map((m) => [m.id, m]));
@@ -67,6 +74,7 @@ async function dispatch({ intent, apiKey, model, goalSetter, sectionManifest, st
         realReviews,
         googlePlaceId,
         realAddress,
+        businessProfile,
       });
       files.push({ ...result, wireframeId });
       onProgress(buildFileBlock(result.path, result.content));

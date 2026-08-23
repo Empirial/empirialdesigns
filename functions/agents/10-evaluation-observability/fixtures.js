@@ -22,7 +22,8 @@ const GOAL_SETTER_CASES = [
     name: 'create — bakery (warm/amber hue)',
     intent: 'create',
     rawInput: "Build a website for Miller's Bakery, a small neighborhood bakery in Portland known for sourdough and morning pastries.",
-    expect: (r) => r.affectedSections.length === 6 && r.palette.accentHue >= 15 && r.palette.accentHue <= 45,
+    expect: (r) => r.affectedSections.length === 6 && r.palette.accentHue >= 15 && r.palette.accentHue <= 45
+      && !!r.profile && typeof r.profile.businessType === 'string' && r.profile.businessType.length > 0,
   },
   {
     name: 'create — law firm (navy/teal hue)',
@@ -87,6 +88,22 @@ const GOAL_SETTER_CASES = [
     rawInput: "Add a map — we're at 118 SE Alder St, Portland, OR 97214.",
     sectionManifest: [{ id: 'hero', summary: 'Bakery hero', wireframe: 2 }],
     expect: (r) => r.affectedSections.includes('footer') && typeof r.realAddress === 'string' && r.realAddress.includes('118 SE Alder'),
+  },
+  {
+    name: 'edit — new stable fact captured as a profile update',
+    intent: 'edit',
+    rawInput: 'We just started offering custom wedding cake orders — can you mention that in the services section?',
+    sectionManifest: [{ id: 'services', summary: 'Bakery services list', wireframe: 1 }],
+    businessProfile: { businessType: 'neighborhood bakery', audience: 'local families', toneKeywords: ['warm', 'casual'], keyFacts: ['family-owned since 1998'] },
+    expect: (r) => Array.isArray(r.profileUpdates?.keyFactsAdd) && r.profileUpdates.keyFactsAdd.length > 0,
+  },
+  {
+    name: 'edit — explicit tone/rebrand request updates the locked profile',
+    intent: 'edit',
+    rawInput: "Actually, let's change our whole voice — make it feel way more playful and fun from now on, not formal.",
+    sectionManifest: [{ id: 'hero', summary: 'Law firm hero', wireframe: 2 }],
+    businessProfile: { businessType: 'family law firm', audience: 'people going through a divorce', toneKeywords: ['formal', 'reassuring'], keyFacts: [] },
+    expect: (r) => Array.isArray(r.profileUpdates?.toneKeywords) && r.profileUpdates.toneKeywords.length > 0,
   },
 ];
 

@@ -37,6 +37,7 @@ const goalSetter = require('./goalSetter');
 const manager = require('./manager');
 const { answerStatusQuery } = require('./statusAssistant');
 const fileEditor = require('./fileEditor');
+const { buildInitialProfile, mergeProfileUpdates } = require('../06-memory-context/businessProfile');
 const { SECTION_FILES, CONTENT_SECTIONS, LINK_SECTIONS, ALL_SECTIONS, DEFAULT_PALETTE, buildIndexCssFile, buildFileBlock, partitionByOwnership } = require('../shared');
 
 // The one write-ownership manifest for this turn — see shared.js's
@@ -70,6 +71,15 @@ const RESERVED_SECTION_PATHS = Object.values(SECTION_FILES);
  *   priorStyle on every edit — UNLESS this edit is itself an explicit
  *   request to recolor the site, in which case Goal Setter's `recolor: true`
  *   overrides it with a freshly-inferred palette (see "Recolor" below).
+ * @param {{businessType:?string,audience:?string,toneKeywords:string[],keyFacts:string[]}} [opts.priorBusinessProfile] -
+ *   the repo's persistent business-context doc (see
+ *   06-memory-context/businessProfile.js), if any. Built fresh on 'create'
+ *   from Goal Setter's own inference; on 'edit', merged forward via
+ *   mergeProfileUpdates — an append-only, deterministic merge (never
+ *   trusted to the model to return "the whole object"), same reasoning as
+ *   priorStyle/priorPalette above. Passed to Goal Setter as context and to
+ *   Manager (so every Coder's prompt can stay consistent with keyFacts/
+ *   toneKeywords) — see coders/runCoder.js.
  * @param {Array<{name:string,rating:number,text:string,relativeTime:string,avatarUrl?:string}>} [opts.realReviews] -
  *   a business's real Google reviews (integrations/google/places.js), if the
  *   caller has a linked place. Passed straight through to Manager; only the
@@ -104,9 +114,17 @@ const RESERVED_SECTION_PATHS = Object.values(SECTION_FILES);
  * @param {(chunk: string) => void} [opts.onProgress] - called with plain
  *   text or `<file>` block chunks as they become available, in order.
  */
-async function runPipeline({ intent, rawInput, apiKey, model, sectionManifest, priorStyle, priorPalette, realReviews, googlePlaceId, getFileContent, listProjectFiles, getProjectFileContent, statusSnapshot, statusToolCtx, onProgress = () => {} }) {
-  const goals = await goalSetter.run(apiKey, model, { intent, rawInput, sectionManifest });
+async function runPipeline({ intent, rawInput, apiKey, model, sectionManifest, priorStyle, priorPalette, priorBusinessProfile, realReviews, googlePlaceId, getFileContent, listProjectFiles, getProjectFileContent, statusSnapshot, statusToolCtx, onProgress = () => {} }) {
+  const goals = await goalSetter.run(apiKey, model, { intent, rawInput, sectionManifest, businessProfile: priorBusinessProfile });
   const style = intent === 'create' ? goals.style : (priorStyle || 'default');
+  // Business profile: built fresh from Goal Setter's own create-time
+  // inference, or merged forward deterministically on every edit (append-
+  // only keyFacts, replace-if-given businessType/audience/toneKeywords) —
+  // see 06-memory-context/businessProfile.js's own comment for why this
+  // isn't trusted to the model to return wholesale.
+  const businessProfile = intent === 'create'
+    ? buildInitialProfile(goals.profile || {})
+    : mergeProfileUpdates(priorBusinessProfile, goals.profileUpdates);
   // Recolor: an edit Goal Setter identified as an explicit request to change
   // color/theme/branding (not merely any edit — see its own system prompt)
   // gets a freshly-inferred palette instead of the locked-in prior one, and
@@ -140,6 +158,7 @@ async function runPipeline({ intent, rawInput, apiKey, model, sectionManifest, p
       needsClarification: goals.statusQuery ? null : summary,
       style,
       palette,
+      businessProfile,
       recolored: false,
     };
   }
@@ -170,6 +189,7 @@ async function runPipeline({ intent, rawInput, apiKey, model, sectionManifest, p
         realReviews,
         googlePlaceId,
         realAddress: goals.realAddress,
+        businessProfile,
         getFileContent,
         onProgress,
       }).then((result) => {
@@ -238,6 +258,7 @@ async function runPipeline({ intent, rawInput, apiKey, model, sectionManifest, p
     newSectionManifest,
     style,
     palette,
+    businessProfile,
     recolored: recolor,
   };
 }

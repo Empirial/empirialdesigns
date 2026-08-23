@@ -129,11 +129,14 @@ What state carries forward between turns:
   and handed to Goal Setter as `current_status` — see layer 3/4's status
   tools for what happens when this cached snapshot isn't fresh enough.
 
-Still on the roadmap, not yet built: a per-project "what this business is"
-context doc (business type, sections, key facts like real pricing) that
-every edit call would read, so "change the prices" resolves against real
-site context instead of the model re-guessing from a bare instruction each
-time. This file is the intended home for that too, once it's built.
+- `businessProfile.js`'s `business_profile` doc — business type, audience,
+  tone, and stable key facts, built once on create and merged forward
+  (append-only for facts) on every edit, so "change the prices" or any
+  other request resolves against real, persistent site context instead of
+  the model re-guessing from a bare instruction each time. Read by every
+  Coder (not just Goal Setter) so copy never contradicts a fact set turns
+  earlier. See that file's own comment and this layer's README for the
+  full design.
 
 ## 7 — Limits and guardrails
 [`07-guardrails/`](./07-guardrails/)

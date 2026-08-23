@@ -110,6 +110,7 @@ async function runGoalSetterCases() {
         intent: c.intent,
         rawInput: c.rawInput,
         sectionManifest: c.sectionManifest,
+        businessProfile: c.businessProfile,
       });
       const ok = c.expect(result);
       results[caseName] = ok;

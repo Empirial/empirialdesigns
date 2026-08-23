@@ -30,7 +30,29 @@ const STYLE_VOICE = {
   minimalist: 'Voice: quiet, plain, specific — avoid hype words ("amazing", "revolutionary", "game-changing"), let the facts carry it, understatement over emphasis.',
 };
 
-async function writeContent(apiKey, model, { section, config, contentTokens, goal, currentContent, manifestContext, wireframeId, isNewLayout, style }) {
+// Persistent business context (06-memory-context/businessProfile.js), folded
+// into every Coder's prompt — unlike realReviews/googlePlaceId (one section
+// each), tone and key facts matter to every section equally. keyFacts is the
+// load-bearing half: a coder inventing copy that contradicts a fact set 20
+// turns ago (wrong years-in-business, wrong service area) is exactly the
+// drift a memoryless per-turn call used to allow. toneKeywords reinforces
+// STYLE_VOICE below rather than replacing it — a locked style pack's voice
+// note stays the primary signal, this just keeps a *rebranded* tone (via an
+// explicit profile_updates edit — see goalSetter.js) from silently reverting
+// on the next unrelated copy tweak.
+function businessProfileNote(businessProfile) {
+  if (!businessProfile) return '';
+  const parts = [];
+  if (businessProfile.toneKeywords && businessProfile.toneKeywords.length > 0) {
+    parts.push(`Voice/tone for this business: ${businessProfile.toneKeywords.join(', ')}.`);
+  }
+  if (businessProfile.keyFacts && businessProfile.keyFacts.length > 0) {
+    parts.push(`Known facts about this business — treat these as true and never contradict them: ${businessProfile.keyFacts.join('; ')}.`);
+  }
+  return parts.length > 0 ? `\n\n${parts.join(' ')}` : '';
+}
+
+async function writeContent(apiKey, model, { section, config, contentTokens, goal, currentContent, manifestContext, wireframeId, isNewLayout, style, businessProfile }) {
   if (contentTokens.length === 0) return {};
 
   const wireframeDescription = config.wireframes[wireframeId - 1];
@@ -41,7 +63,7 @@ async function writeContent(apiKey, model, { section, config, contentTokens, goa
     ? `\n\nThis section already exists; write updated copy that applies the goal to what's already there rather than starting from nothing. Current file for reference:\n${currentContent}`
     : '';
   const extra = config.extraInstructions ? `\n\n${config.extraInstructions}` : '';
-  const voice = STYLE_VOICE[style] ? `\n\n${STYLE_VOICE[style]}` : '';
+  const voice = (STYLE_VOICE[style] ? `\n\n${STYLE_VOICE[style]}` : '') + businessProfileNote(businessProfile);
 
   const system = buildSystemPrompt({ section, wireframeId, wireframeDescription, goal, editNote, manifestNote, extra, voice, contentTokens });
 
@@ -80,13 +102,13 @@ function applyRealReviews(values, realReviews) {
   return overridden;
 }
 
-async function runCoder(apiKey, model, { section, config, goal, currentContent, manifestContext, wireframeId, isNewLayout, style, realReviews, googlePlaceId, realAddress }) {
+async function runCoder(apiKey, model, { section, config, goal, currentContent, manifestContext, wireframeId, isNewLayout, style, realReviews, googlePlaceId, realAddress, businessProfile }) {
   const filePath = SECTION_FILES[section];
   const templateSource = loadTemplate(section, wireframeId);
   const contentTokens = extractTokens(templateSource).filter((t) => !isAssetToken(t) && t !== 'COPYRIGHT_YEAR');
 
   let values = await writeContent(apiKey, model, {
-    section, config, contentTokens, goal, currentContent, manifestContext, wireframeId, isNewLayout, style,
+    section, config, contentTokens, goal, currentContent, manifestContext, wireframeId, isNewLayout, style, businessProfile,
   });
   if (section === 'testimonials') values = applyRealReviews(values, realReviews);
 

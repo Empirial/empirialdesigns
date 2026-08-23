@@ -9,6 +9,8 @@
   "goalSetter: edit — build error routes to file_fix": true,
   "goalSetter: edit — map request routes to footer, no address given": true,
   "goalSetter: edit — real address in message is captured verbatim": true,
+  "goalSetter: edit — new stable fact captured as a profile update": true,
+  "goalSetter: edit — explicit tone/rebrand request updates the locked profile": true,
   "copy: hero": true,
   "copy: about": true,
   "copy: services": true,

@@ -988,6 +988,11 @@ exports.createWebsite = functions.runWith({ memory: '1GB', timeoutSeconds: 300 }
         section_manifest: pipelineResult.newSectionManifest,
         style: pipelineResult.style,
         palette: pipelineResult.palette,
+        // Persistent business-context doc (agents/06-memory-context/
+        // businessProfile.js) — built once here from Goal Setter's own
+        // create-time inference, read back and carried forward on every
+        // aiChat edit below so tone/facts don't reset to "unknown" each turn.
+        business_profile: pipelineResult.businessProfile,
         google_place_id: googlePlaceId || null,
         seo_manifest: seoManifest,
         seo_status: 'GENERATED',
@@ -1099,6 +1104,7 @@ exports.aiChat = functions.https.onRequest((req, res) => {
       let sectionManifest;
       let priorStyle;
       let priorPalette;
+      let priorBusinessProfile;
       let googlePlaceId;
       let repoData = null;
       try {
@@ -1111,6 +1117,12 @@ exports.aiChat = functions.https.onRequest((req, res) => {
         // 'default'/DEFAULT_PALETTE inside the pipeline.
         priorStyle = repoData ? repoData.style : undefined;
         priorPalette = repoData ? repoData.palette : undefined;
+        // Persistent business-context doc (agents/06-memory-context/
+        // businessProfile.js) — undefined for a repo created before this
+        // existed, same fallback shape as priorStyle/priorPalette above;
+        // pipeline.js's mergeProfileUpdates already handles a null/undefined
+        // base.
+        priorBusinessProfile = repoData ? repoData.business_profile : undefined;
         googlePlaceId = repoData ? repoData.google_place_id : undefined;
       } catch (manifestReadError) {
         console.error('aiChat: failed to read section_manifest, continuing without it:', manifestReadError);
@@ -1205,6 +1217,7 @@ exports.aiChat = functions.https.onRequest((req, res) => {
         sectionManifest,
         priorStyle,
         priorPalette,
+        priorBusinessProfile,
         realReviews,
         googlePlaceId,
         getFileContent: (section) => fetchSectionContentFromGitHub(repoOwner, repoName, SECTION_FILES[section], GITHUB_TOKEN),
@@ -1291,11 +1304,18 @@ exports.aiChat = functions.https.onRequest((req, res) => {
       // files.length is the actually-correct condition, since it's true
       // exactly when there's something worth committing regardless of which
       // of the three paths produced it.
-      if (pipelineResult.affectedSections.length > 0 || pipelineResult.recolored || pipelineResult.files.length > 0) {
+      // Business profile can change (a new key fact, a tone update) on a
+      // turn that touches no section and isn't a recolor/file_fix either —
+      // e.g. "just so you know, we're open till 9pm now" with nothing else
+      // asked. Compared by value, not by an intent flag, since profile.js's
+      // merge is the only thing that knows whether anything actually moved.
+      const businessProfileChanged = JSON.stringify(pipelineResult.businessProfile) !== JSON.stringify(priorBusinessProfile || null);
+      if (pipelineResult.affectedSections.length > 0 || pipelineResult.recolored || pipelineResult.files.length > 0 || businessProfileChanged) {
         const repoUpdate = {
           section_manifest: pipelineResult.newSectionManifest,
           style: pipelineResult.style,
           palette: pipelineResult.palette,
+          business_profile: pipelineResult.businessProfile,
           last_updated: nowIso,
         };
         if (pipelineResult.files.length > 0) {
