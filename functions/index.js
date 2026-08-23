@@ -36,6 +36,7 @@ const { buildAuthUrl, exchangeCodeForTokens, getValidAccessToken } = require("./
 const { getVerificationToken, verifySite } = require("./integrations/google/verification");
 const { addSite, submitSitemap: submitSitemapToGoogle, getSearchAnalytics, inspectUrl } = require("./integrations/google/searchConsole");
 const { MAX_IMAGES_PER_SITE, buildImagePrompt, generateImage: generateOpenRouterImage } = require("./integrations/openrouter/imageGeneration");
+const { generateSpeech } = require("./integrations/openrouter/textToSpeech");
 const { runPageSpeed } = require("./integrations/google/pagespeed");
 const { createMonitor: createUptimeMonitor, getMonitorStatus: getUptimeMonitorStatus, deleteMonitor: deleteUptimeMonitor } = require("./integrations/uptime/uptimeRobot");
 const { findPlace: findGooglePlaceCandidates, getPlaceReviews } = require("./integrations/google/places");
@@ -467,6 +468,7 @@ const RATE_LIMITS = {
   createWebsite: { max: 5, windowMs: 60 * 60 * 1000 },        // 5 new sites/hour
   aiChat: { max: 30, windowMs: 60 * 60 * 1000 },               // 30 edits/hour
   generateImage: { max: 15, windowMs: 24 * 60 * 60 * 1000 },   // 15 images/day (on top of the 5-per-project cap)
+  textToSpeech: { max: 40, windowMs: 24 * 60 * 60 * 1000 },    // 40 speaker-button plays/day per user
 };
 
 function rateLimitResponse(res, retryAfterMs) {
@@ -505,6 +507,21 @@ async function githubJson(url, options, stepName, githubToken) {
   return body;
 }
 
+// Must match getRepoTree's binary asset contract: these paths are held in
+// Firestore/Sandpack as a raw.githubusercontent.com URL string, not real
+// file bytes — see getRepoTree's own comment on why (embedding base64
+// content for these turned out to be chasing a known, unresolved Sandpack
+// bug, codesandbox/sandpack#1281). That means these paths must NEVER be
+// committed back to GitHub as file content: GitHub already holds the real
+// bytes untouched, and writing the cached URL string over them would
+// silently replace a real image/font/video with garbage text — exactly the
+// corruption this filter exists to prevent (it happened for real, twice,
+// before this existed).
+const BINARY_ASSET_EXTENSION_RE = /\.(?:avif|bmp|gif|ico|jpe?g|png|svg|webp|woff2?|ttf|otf|eot|mp4|webm|mp3|wav|ogg|pdf|zip)$/i;
+function isBinaryAssetPath(path) {
+  return typeof path === 'string' && BINARY_ASSET_EXTENSION_RE.test(path);
+}
+
 // Commits the given files as one new commit on top of the branch's current
 // HEAD — unlike createWebsite's very first commit (base_tree: null, since
 // that one replaces auto_init's README wholesale), this builds on top of
@@ -512,6 +529,22 @@ async function githubJson(url, options, stepName, githubToken) {
 // real prior content. Used by requestRepoSync and publishWebsite's
 // pre-publish flush — see docs/AI_BUILDER_ENGINE.md's write/sync-path split.
 async function commitFilesToGithub(repoOwner, repoName, branch, files, message, githubToken) {
+  // Drop binary-asset paths before touching the GitHub API at all — see
+  // isBinaryAssetPath's comment. Every caller of this function reads from
+  // the same Firestore `files` cache that getRepoTree seeds with URL
+  // placeholders for these paths, so this one filter protects all of them
+  // (aiChat's inline commit, requestRepoSync/scheduledRepoSync, and
+  // publishWebsite's pre-publish flush) without needing each call site to
+  // remember to filter itself.
+  const syncableFiles = files.filter((f) => !isBinaryAssetPath(f.path));
+  const skipped = files.length - syncableFiles.length;
+  if (skipped > 0) {
+    console.log(`commitFilesToGithub: skipped ${skipped} binary-asset path(s) — never synced back, GitHub already has the real bytes.`);
+  }
+  if (syncableFiles.length === 0) {
+    throw Object.assign(new Error('Nothing to commit — no non-binary-asset files.'), { noop: true });
+  }
+
   const headRef = await githubJson(
     `https://api.github.com/repos/${repoOwner}/${repoName}/git/refs/heads/${branch}`,
     {}, 'fetch head ref', githubToken
@@ -523,10 +556,15 @@ async function commitFilesToGithub(repoOwner, repoName, branch, files, message, 
   );
 
   const blobs = [];
-  for (const file of files) {
+  for (const file of syncableFiles) {
+    // Every file left after the binary-asset filter above is real UTF-8
+    // source text — no encoding tag needed on this side any more (the
+    // base64 branch this used to have was for exactly the content this
+    // function now refuses to accept).
+    const contentBuffer = Buffer.from(file.content, 'utf8');
     const blob = await githubJson(`https://api.github.com/repos/${repoOwner}/${repoName}/git/blobs`, {
       method: 'POST',
-      body: JSON.stringify({ content: Buffer.from(file.content).toString('base64'), encoding: 'base64' }),
+      body: JSON.stringify({ content: contentBuffer.toString('base64'), encoding: 'base64' }),
     }, `blob create (${file.path})`, githubToken);
     blobs.push({ path: file.path, sha: blob.sha, mode: '100644', type: 'blob' });
   }
@@ -1115,6 +1153,50 @@ exports.aiChat = functions.https.onRequest((req, res) => {
         res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: chunk } }] })}\n\n`);
       };
 
+      // Backs the File Editor agent (fileEditor.js) when Goal Setter
+      // classifies this turn as a file_fix — see docs/AI_BUILDER_ENGINE.md.
+      // Unlike getFileContent above (locked to the 6 SECTION_FILES paths),
+      // these two see the whole project.
+      const listProjectFiles = async () => {
+        const paths = new Set();
+        try {
+          const filesSnap = await db.collection('user_repos').doc(repoId).collection('files').get();
+          filesSnap.docs.forEach((d) => { const p = d.data().path; if (p) paths.add(p); });
+        } catch (e) {
+          console.error('aiChat: listProjectFiles Firestore read failed:', e);
+        }
+        // Merge in a live GitHub path listing too (paths only, no content
+        // fetch — cheap) since the Firestore cache can be incomplete: a
+        // repo created by createWebsite never had every file written there
+        // in the first place (docs/AI_BUILDER_ENGINE.md's Phase 1), and an
+        // imported repo's cache is only ever as complete as getRepoTree's
+        // own tree fetch was at import time.
+        try {
+          const branch = process.env.VERCEL_PRODUCTION_BRANCH || 'main';
+          const treeRes = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/git/trees/${branch}?recursive=1`, {
+            headers: { Authorization: `Bearer ${GITHUB_TOKEN}` },
+          });
+          if (treeRes.ok) {
+            const treeData = await treeRes.json();
+            (treeData.tree || [])
+              .filter((n) => n.type === 'blob' && !n.path.includes('node_modules/') && !n.path.includes('dist/'))
+              .forEach((n) => paths.add(n.path));
+          }
+        } catch (e) {
+          console.error('aiChat: listProjectFiles GitHub tree fetch failed:', e);
+        }
+        return Array.from(paths);
+      };
+      const getProjectFileContent = async (path) => {
+        try {
+          const fileSnap = await db.collection('user_repos').doc(repoId).collection('files').doc(encodeURIComponent(path)).get();
+          if (fileSnap.exists && fileSnap.data().content !== undefined) return fileSnap.data().content;
+        } catch (e) {
+          console.error('aiChat: getProjectFileContent Firestore read failed:', e);
+        }
+        return fetchSectionContentFromGitHub(repoOwner, repoName, path, GITHUB_TOKEN);
+      };
+
       const pipelineResult = await runPipeline({
         intent: 'edit',
         rawInput,
@@ -1126,6 +1208,8 @@ exports.aiChat = functions.https.onRequest((req, res) => {
         realReviews,
         googlePlaceId,
         getFileContent: (section) => fetchSectionContentFromGitHub(repoOwner, repoName, SECTION_FILES[section], GITHUB_TOKEN),
+        listProjectFiles,
+        getProjectFileContent,
         statusSnapshot,
         statusToolCtx,
         onProgress: sendChunk,
@@ -1156,6 +1240,17 @@ exports.aiChat = functions.https.onRequest((req, res) => {
               updated_at: nowIso,
             });
           }
+          // Mark dirty + stamp last_edit_at before attempting the GitHub
+          // commit below — if this request dies (timeout, crash) before
+          // reaching that commit, scheduledRepoSync's sweep still has a
+          // last_edit_at/github_sync_status to find this repo by, instead of
+          // it silently staying `clean` while the files subcollection has
+          // moved on.
+          batch.set(repoRef, {
+            github_sync_status: 'dirty',
+            pending_edit_count: admin.firestore.FieldValue.increment(pipelineResult.files.length),
+            last_edit_at: nowIso,
+          }, { merge: true });
           await batch.commit();
         } catch (persistError) {
           console.error('aiChat: failed to persist edited files to Firestore:', persistError);
@@ -1169,9 +1264,16 @@ exports.aiChat = functions.https.onRequest((req, res) => {
       // watching stream in — a failure here just leaves github_sync_status
       // behind for the next explicit Save/Publish to catch, same fallback
       // publishWebsite already force-syncs around. Also fires on a pure
-      // recolor (zero affected sections, palette changed) — otherwise the
-      // new palette would never make it past this turn's stream.
-      if (pipelineResult.affectedSections.length > 0 || pipelineResult.recolored) {
+      // recolor (zero affected sections, palette changed) and a pure
+      // file_fix (zero affected sections, nothing recolored, but the File
+      // Editor agent — pipeline.js's fileEditor.js — produced real files) —
+      // affectedSections/recolored alone used to gate this whole block,
+      // which meant a file_fix-only turn's changes landed in Firestore
+      // (unconditional, above) but never got committed to GitHub inline:
+      // files.length is the actually-correct condition, since it's true
+      // exactly when there's something worth committing regardless of which
+      // of the three paths produced it.
+      if (pipelineResult.affectedSections.length > 0 || pipelineResult.recolored || pipelineResult.files.length > 0) {
         const repoUpdate = {
           section_manifest: pipelineResult.newSectionManifest,
           style: pipelineResult.style,
@@ -1191,8 +1293,19 @@ exports.aiChat = functions.https.onRequest((req, res) => {
             repoUpdate.last_synced_at = nowIso;
             repoUpdate.last_commit_sha = commitSha;
           } catch (syncError) {
-            console.error('aiChat: failed to sync edited files to GitHub:', syncError);
-            repoUpdate.github_sync_status = 'pending';
+            if (syncError.noop) {
+              // Every file this turn produced happened to be a binary-asset
+              // path (see commitFilesToGithub's own guard) — nothing was
+              // actually wrong, there was just nothing real to push.
+              repoUpdate.github_sync_status = 'clean';
+              repoUpdate.pending_edit_count = 0;
+            } else {
+              console.error('aiChat: failed to sync edited files to GitHub:', syncError);
+              // 'error' (not the old 'pending', which scheduledRepoSync's
+              // query didn't recognize) — this repo stays picked up by the
+              // sweep until a sync actually succeeds.
+              repoUpdate.github_sync_status = 'error';
+            }
           }
         }
         try {
@@ -1208,8 +1321,12 @@ exports.aiChat = functions.https.onRequest((req, res) => {
       if (streamStarted) {
         // Headers are already sent — surface the failure inside the stream
         // itself (parsed the same as any other chunk) rather than trying to
-        // change the response status this late.
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n[Note: something went wrong — ${error.message}]` } }] })}\n\n`);
+        // change the response status this late. The real error is already
+        // logged above; what reaches the user stays in the same warm,
+        // first-person voice as every other reply, not a raw error message
+        // or a bracketed internal-sounding note (see agents/05-agent-loop's
+        // manager.js/pipeline.js for the same fix on a per-section failure).
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\nSomething went wrong on my end before I could finish that — go ahead and try again.` } }] })}\n\n`);
         res.end();
       } else {
         res.status(500).json({ error: error.message });
@@ -1257,20 +1374,101 @@ exports.getRepoTree = functions.https.onRequest((req, res) => {
       // 3. Filter for blobs (files) and fetch content
       const blobs = treeData.tree.filter(node => node.type === 'blob');
 
-      // Limit to specific extensions and reasonable count
-      const textExtensions = ['.js', '.jsx', '.ts', '.tsx', '.css', '.html', '.json', '.md'];
-      const fileBlobs = blobs.filter(blob => {
-        return textExtensions.some(ext => blob.path.endsWith(ext)) &&
-          !blob.path.includes('package-lock.json') &&
-          !blob.path.includes('yarn.lock') &&
-          !blob.path.includes('dist/');
-      }).slice(0, 50);
+      // Blacklist, not a whitelist: clone everything the repo actually has,
+      // except a short list of things that are never meaningful to Sandpack
+      // (or unsafe to hand to the browser). This replaced an extension
+      // *whitelist* (.js/.jsx/.ts/.tsx/.css/.html/.json/.md) that silently
+      // dropped anything else — which is exactly how the hero-fitness.jpg
+      // bug happened: the file was real on GitHub, just never on the
+      // allowed-extensions list, so Sandpack's "Could not find module" read
+      // as a code bug when it was actually this filter. A whitelist means
+      // every new file type someone's real project happens to use is a
+      // fix-after-it-breaks; a blacklist only needs excluding what's
+      // actually never wanted, once.
+      //
+      // Excluded, and why:
+      // - node_modules/, dist/, build/, .git/ — never part of source, and
+      //   node_modules/dist can be huge.
+      // - .env / .env.* — real secrets (API keys, tokens). These must never
+      //   reach Firestore or a browser-visible Sandpack file tree, whitelist
+      //   or not — this is the one exclusion that's a security requirement,
+      //   not a performance one.
+      // - lockfiles (package-lock.json, yarn.lock, pnpm-lock.yaml,
+      //   bun.lockb) — real but Sandpack never imports them and they can be
+      //   large.
+      const EXCLUDE_PATTERNS = [
+        /(^|\/)node_modules\//, /(^|\/)dist\//, /(^|\/)build\//, /(^|\/)\.git\//,
+        /(^|\/)\.env(\.|$)/,
+        /(^|\/)package-lock\.json$/, /(^|\/)yarn\.lock$/, /(^|\/)pnpm-lock\.yaml$/, /(^|\/)bun\.lockb$/,
+      ];
+      const isExcluded = (path) => EXCLUDE_PATTERNS.some((re) => re.test(path));
+
+      // Encoding, not inclusion: still extension-based, because Sandpack's
+      // per-file `code` must be raw text for source/config files (it parses
+      // .json, transpiles .tsx, etc.) but a plain URL string for real binary
+      // assets (see the comment further down on why — this replaced an
+      // embedded-base64 approach that turned out to be chasing a dead end).
+      // Anything not in this binary list is fetched as text — correct for
+      // the huge majority of a real project (.mjs, .yml, .toml, .txt, .scss,
+      // and everything else source-shaped) and an acceptable gap for a
+      // genuinely exotic binary type (.pdf, .zip) nobody's imported into one
+      // of these sites yet; that would show as a corrupted-text warning in
+      // the console, not a silent drop, so it's diagnosable if it happens.
+      const binaryExtensions = ['.avif', '.bmp', '.gif', '.ico', '.jpg', '.jpeg', '.png', '.svg', '.webp', '.woff', '.woff2', '.ttf', '.otf', '.eot', '.mp4', '.webm', '.mp3', '.wav', '.ogg', '.pdf', '.zip'];
+
+      // Per-file size cap — a blacklist otherwise lets through anything not
+      // explicitly named, including a stray video or design file a
+      // whitelist would've skipped by accident. Skip-and-log (not fail):
+      // one oversized asset shouldn't block the other 200 files in the repo
+      // from loading. 2MB comfortably covers real source/text files; well
+      // past that is almost always something Sandpack was never going to
+      // parse as code anyway. Binary assets are exempt — since they're now
+      // referenced by raw.githubusercontent.com URL rather than fetched and
+      // embedded (see below), their size costs nothing here regardless of
+      // how large the actual image/video is.
+      const MAX_FILE_BYTES = 2 * 1024 * 1024;
+      // Same reasoning as before (still a real safety net even under a
+      // blacklist): a repo with, say, a full `node_modules` accidentally
+      // committed shouldn't turn into thousands of parallel GitHub fetches.
+      const MAX_IMPORTED_FILES = 400;
+
+      const isBinaryPath = (path) => binaryExtensions.some((ext) => path.toLowerCase().endsWith(ext));
+      const matchingBlobs = blobs.filter((blob) => !isExcluded(blob.path));
+      const oversized = matchingBlobs.filter((blob) => !isBinaryPath(blob.path) && blob.size > MAX_FILE_BYTES);
+      if (oversized.length > 0) {
+        console.warn(`getRepoTree: ${owner}/${repo} skipping ${oversized.length} file(s) over ${MAX_FILE_BYTES} bytes:`, oversized.map((b) => b.path));
+      }
+      const sizedBlobs = matchingBlobs.filter((blob) => isBinaryPath(blob.path) || blob.size <= MAX_FILE_BYTES);
+      if (sizedBlobs.length > MAX_IMPORTED_FILES) {
+        console.warn(`getRepoTree: ${owner}/${repo} has ${sizedBlobs.length} files after exclusions, truncating to ${MAX_IMPORTED_FILES} — some imports may 404 in Sandpack.`);
+      }
+      const fileBlobs = sizedBlobs.slice(0, MAX_IMPORTED_FILES);
 
       const files = {};
 
       // Parallel fetch for speed
       await Promise.all(fileBlobs.map(async (blob) => {
         try {
+          const binaryExt = binaryExtensions.find((ext) => blob.path.toLowerCase().endsWith(ext));
+          const path = blob.path.startsWith('/') ? blob.path : '/' + blob.path;
+          if (binaryExt) {
+            // Embedding binary content directly (base64, with or without a
+            // "data:" prefix) turned out to be a dead end — this is a known,
+            // still-open Sandpack bug (codesandbox/sandpack#1281): the
+            // react/react-ts bundler this app uses doesn't reliably resolve
+            // an import to embedded binary content either way, confirmed by
+            // testing both encodings against a real repo. Pointing the
+            // import at the file's real raw.githubusercontent.com URL
+            // instead sidesteps the bug entirely — the browser just fetches
+            // it like any external image, exactly how this pipeline's own
+            // generated sites already reference images (placehold.co /
+            // OpenRouter URLs, never a local binary import — see
+            // 04-tool-execution/templates.js). No GitHub API call needed for
+            // these paths any more, either — cheaper than the base64 fetch
+            // it replaces.
+            files[path] = { code: `https://raw.githubusercontent.com/${owner}/${repo}/${defaultBranch}/${blob.path}` };
+            return;
+          }
           const contentRes = await fetch(blob.url, {
             headers: {
               'Authorization': `Bearer ${GITHUB_TOKEN}`,
@@ -1281,7 +1479,6 @@ exports.getRepoTree = functions.https.onRequest((req, res) => {
             const text = await contentRes.text();
             // Store with leading slash for Sandpack if needed, usually just path is fine
             // Sandpack expects paths like "/src/App.js"
-            const path = blob.path.startsWith('/') ? blob.path : '/' + blob.path;
             files[path] = { code: text };
           }
         } catch (e) {
@@ -1535,16 +1732,58 @@ exports.setGoogleAnalytics = functions.https.onRequest((req, res) => {
   });
 });
 
-// Explicit-flush GitHub sync: reads the current `files` subcollection and
-// commits it to GitHub. This is the piece docs/AI_BUILDER_ENGINE.md
-// describes (onRepoFileWrite trigger + scheduled sweep) that was never
-// actually implemented in this file — SaveButton.tsx has been calling this
-// endpoint by name since before it existed, silently 404ing and falling
-// back to "will retry on the next scheduled sweep" (which also doesn't
-// exist). This is the real implementation of the explicit-Save half of that
-// design; the trigger/sweep half stays a known gap — publishWebsite below
-// always force-syncs first specifically because that gap means GitHub can
-// otherwise be arbitrarily stale.
+// Shared by requestRepoSync (explicit flush) and scheduledRepoSync (the
+// backstop sweep) — reads the current `files` subcollection and commits it
+// to GitHub, marking the repo doc clean/error accordingly. Full-tree pushes
+// are safe to call repeatedly (git blobs are content-addressed), so this is
+// idempotent under overlapping callers.
+async function syncRepoFilesToGithub(repoId, ref, repo) {
+  if (!repo.repo_url || !repo.repo_owner || !repo.repo_name) {
+    // Not GitHub-backed yet (e.g. a createRepoFromPrompt placeholder
+    // project) — nothing to sync to, not an error.
+    return { synced: false, reason: 'not GitHub-backed yet' };
+  }
+
+  const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+  if (!GITHUB_TOKEN) throw Object.assign(new Error('Server configuration error'), { httpStatus: 500 });
+
+  const filesSnap = await db.collection('user_repos').doc(repoId).collection('files').get();
+  if (filesSnap.empty) return { synced: false, reason: 'no cached edits to sync' };
+
+  const files = filesSnap.docs
+    .map((d) => ({ path: d.data().path, content: d.data().content }))
+    .filter((f) => f.path && f.content !== undefined);
+
+  // A repo can be `dirty` purely because hydrateFromGithub re-seeded its
+  // binary-asset placeholder entries (see getRepoTree/commitFilesToGithub's
+  // own comments) with nothing a real edit ever touched. That's not an
+  // error — there's simply nothing this sync needed to do — so it's handled
+  // before ever calling commitFilesToGithub, same reasoning as the
+  // filesSnap.empty check just above.
+  if (files.every((f) => isBinaryAssetPath(f.path))) {
+    await ref.set({ github_sync_status: 'clean', pending_edit_count: 0 }, { merge: true });
+    return { synced: false, reason: 'only binary-asset placeholders cached, nothing to sync' };
+  }
+
+  const branch = process.env.VERCEL_PRODUCTION_BRANCH || 'main';
+  try {
+    const commitSha = await commitFilesToGithub(repo.repo_owner, repo.repo_name, branch, files, 'Sync AI edits to GitHub', GITHUB_TOKEN);
+    await ref.set({
+      github_sync_status: 'clean',
+      pending_edit_count: 0,
+      last_synced_at: new Date().toISOString(),
+      last_commit_sha: commitSha,
+    }, { merge: true });
+    return { synced: true, commitSha };
+  } catch (syncError) {
+    await ref.set({ github_sync_status: 'error' }, { merge: true });
+    throw syncError;
+  }
+}
+
+// Explicit-flush GitHub sync — the explicit-Save half of the sync design in
+// docs/AI_BUILDER_ENGINE.md. Delegates to syncRepoFilesToGithub, shared with
+// scheduledRepoSync below.
 exports.requestRepoSync = functions.https.onRequest((req, res) => {
   cors(req, res, async () => {
     const authHeader = req.headers.authorization;
@@ -1555,38 +1794,54 @@ exports.requestRepoSync = functions.https.onRequest((req, res) => {
       if (!repoId) return res.status(400).json({ error: 'Missing repoId' });
 
       const { ref, data: repo } = await resolveOwnedRepo(decodedToken.uid, repoId);
-      if (!repo.repo_url || !repo.repo_owner || !repo.repo_name) {
-        // Not GitHub-backed yet (e.g. a createRepoFromPrompt placeholder
-        // project) — nothing to sync to, not an error.
-        return res.status(200).json({ success: true, synced: false, reason: 'not GitHub-backed yet' });
-      }
-
-      const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-      if (!GITHUB_TOKEN) return res.status(500).json({ error: 'Server configuration error' });
-
-      const filesSnap = await db.collection('user_repos').doc(repoId).collection('files').get();
-      if (filesSnap.empty) return res.status(200).json({ success: true, synced: false, reason: 'no cached edits to sync' });
-
-      const files = filesSnap.docs
-        .map((d) => ({ path: d.data().path, content: d.data().content }))
-        .filter((f) => f.path && f.content !== undefined);
-
-      const branch = process.env.VERCEL_PRODUCTION_BRANCH || 'main';
-      const commitSha = await commitFilesToGithub(repo.repo_owner, repo.repo_name, branch, files, 'Sync AI edits to GitHub', GITHUB_TOKEN);
-
-      await ref.set({
-        github_sync_status: 'clean',
-        pending_edit_count: 0,
-        last_synced_at: new Date().toISOString(),
-        last_commit_sha: commitSha,
-      }, { merge: true });
-
-      return res.status(200).json({ success: true, synced: true, commitSha });
+      const result = await syncRepoFilesToGithub(repoId, ref, repo);
+      return res.status(200).json({ success: true, ...result });
     } catch (error) {
       console.error('Error in requestRepoSync:', error);
       return res.status(error.httpStatus || 500).json({ error: error.message });
     }
   });
+});
+
+// Backstop sweep — the half of docs/AI_BUILDER_ENGINE.md's Phase 2 sync
+// design that was never built (no onRepoFileWrite trigger, no scheduled
+// sweep). Runs every 5 minutes; catches any repo left `dirty`/`error` by a
+// write path that isn't aiChat's inline commit, requestRepoSync, or
+// publishWebsite's force-sync — e.g. a manual Firestore-only edit
+// (saveRepoFiles) where the user never clicked Save or Publish, or closed
+// the tab right after. A 2-minute idle window avoids racing an edit that's
+// still actively in progress.
+exports.scheduledRepoSync = functions.pubsub.schedule('every 5 minutes').onRun(async () => {
+  const IDLE_WINDOW_MS = 2 * 60 * 1000;
+  const cutoff = new Date(Date.now() - IDLE_WINDOW_MS).toISOString();
+
+  const snap = await db.collection('user_repos')
+    .where('github_sync_status', 'in', ['dirty', 'error'])
+    .get();
+
+  let synced = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const doc of snap.docs) {
+    const repo = doc.data();
+    // Still being actively edited — leave it for a later sweep rather than
+    // racing an in-flight aiChat/save write.
+    if (repo.last_edit_at && repo.last_edit_at > cutoff) {
+      skipped++;
+      continue;
+    }
+    try {
+      const result = await syncRepoFilesToGithub(doc.id, doc.ref, repo);
+      if (result.synced) synced++; else skipped++;
+    } catch (error) {
+      failed++;
+      console.error(`scheduledRepoSync: failed to sync repo ${doc.id}:`, error);
+    }
+  }
+
+  console.log(`scheduledRepoSync: synced=${synced} skipped=${skipped} failed=${failed} (of ${snap.size} dirty/error repos)`);
+  return null;
 });
 
 // publishWebsite — PDF section 6.6/6.9. Flushes any pending Firestore edits
@@ -1622,25 +1877,40 @@ exports.publishWebsite = functions.runWith({ timeoutSeconds: 120, memory: '256MB
       const filesByPath = {};
       filesSnap.docs.forEach((d) => {
         const data = d.data();
-        if (data.path && data.content !== undefined) filesByPath[data.path] = data.content;
+        if (data.path && data.content !== undefined) {
+          filesByPath[data.path] = { content: data.content };
+        }
       });
 
       if (repo.google_verification_token) {
-        const currentIndexHtml = filesByPath['index.html']
+        const currentIndexHtml = filesByPath['index.html']?.content
           || await fetchSectionContentFromGitHub(repo.repo_owner, repo.repo_name, 'index.html', GITHUB_TOKEN);
         if (currentIndexHtml && currentIndexHtml !== 'none — new file' && !currentIndexHtml.includes(repo.google_verification_token)) {
-          filesByPath['index.html'] = currentIndexHtml.replace(
+          filesByPath['index.html'] = {
+            content: currentIndexHtml.replace(
             '</head>',
             `    ${renderVerificationTag(repo.google_verification_token)}\n  </head>`
-          );
+            ),
+          };
         }
       }
 
-      const filesToCommit = Object.entries(filesByPath).map(([path, content]) => ({ path, content }));
+      const filesToCommit = Object.entries(filesByPath).map(([path, file]) => ({ path, ...file }));
       if (filesToCommit.length > 0) {
         const branch = process.env.VERCEL_PRODUCTION_BRANCH || 'main';
         try {
-          await commitFilesToGithub(repo.repo_owner, repo.repo_name, branch, filesToCommit, 'Sync before publish', GITHUB_TOKEN);
+          const commitSha = await commitFilesToGithub(repo.repo_owner, repo.repo_name, branch, filesToCommit, 'Sync before publish', GITHUB_TOKEN);
+          // Mark clean — otherwise this repo stays `dirty` in Firestore
+          // forever even though publish just pushed its current files to
+          // GitHub, and scheduledRepoSync's sweep would keep re-syncing it
+          // needlessly (harmless, since commits are idempotent, but wrong
+          // for any UI reading github_sync_status).
+          await ref.set({
+            github_sync_status: 'clean',
+            pending_edit_count: 0,
+            last_synced_at: new Date().toISOString(),
+            last_commit_sha: commitSha,
+          }, { merge: true });
         } catch (syncError) {
           // A no-op commit (nothing actually changed since the last sync)
           // can 422 on some GitHub edge cases — don't fail the whole
@@ -1994,6 +2264,58 @@ exports.generateImage = functions.runWith({ timeoutSeconds: 60, memory: '256MB' 
     } catch (error) {
       console.error('Error in generateImage:', error);
       if (error.imagesDisabled) return res.status(501).json({ error: error.message });
+      return res.status(error.httpStatus || 500).json({ error: error.message });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------
+// OpenRouter text-to-speech (fish-audio/s2.1-pro-free:free) — the "read
+// this reply aloud" speaker button in the builder's assistant chat. Same
+// OPENROUTER_API_KEY as image generation above; see
+// integrations/openrouter/textToSpeech.js for the request shape and why
+// the model is free-but-rate-limited-by-OpenRouter rather than "unlimited".
+// ---------------------------------------------------------------------
+
+exports.textToSpeech = functions.runWith({ timeoutSeconds: 30, memory: '256MB' }).https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(authHeader.split('Bearer ')[1]);
+      const rateLimit = await checkRateLimit(decodedToken.uid, 'textToSpeech', RATE_LIMITS.textToSpeech);
+      if (!rateLimit.allowed) return rateLimitResponse(res, rateLimit.retryAfterMs);
+
+      const { text, voice, repoId } = req.body;
+      if (!text || !String(text).trim()) return res.status(400).json({ error: 'Missing text' });
+
+      // The voice actually used lives on the repo doc (`tts_voice`) once
+      // set — so the speaker button doesn't need to resend it on every
+      // click, and a saved choice survives closing/reopening the project.
+      // Falls back to OPENROUTER_TTS_VOICE (whole-app default) if the repo
+      // has never picked one, and finally to the model's own built-in voice
+      // if that's unset too.
+      let ref = null;
+      let voiceToUse = voice;
+      if (repoId) {
+        ({ ref } = await resolveOwnedRepo(decodedToken.uid, repoId));
+        if (!voiceToUse) {
+          const repoSnap = await ref.get();
+          voiceToUse = repoSnap.data()?.tts_voice;
+        }
+      }
+
+      const { buffer, mimeType } = await generateSpeech({ text, voice: voiceToUse });
+
+      // An explicitly-passed voice becomes this project's saved choice for
+      // next time.
+      if (ref && voice) await ref.update({ tts_voice: voice }).catch(() => {});
+
+      res.set('Content-Type', mimeType);
+      return res.status(200).send(buffer);
+    } catch (error) {
+      console.error('Error in textToSpeech:', error);
+      if (error.ttsDisabled) return res.status(501).json({ error: error.message });
       return res.status(error.httpStatus || 500).json({ error: error.message });
     }
   });
