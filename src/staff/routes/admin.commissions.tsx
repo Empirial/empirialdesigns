@@ -310,20 +310,20 @@ function PageAdminCommissions() {
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barData} layout="vertical" margin={{ left: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                  <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
                   <YAxis
                     type="category"
                     dataKey="name"
                     width={80}
-                    tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
-                    stroke="var(--border)"
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                    stroke="hsl(var(--border))"
                   />
                   <Tooltip
-                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }}
+                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }}
                     formatter={(v: number) => formatZAR(v)}
                   />
-                  <Bar dataKey="commission" fill="var(--chart-1)" radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="commission" fill="hsl(var(--chart-1))" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -335,18 +335,18 @@ function PageAdminCommissions() {
                 <AreaChart data={revenueOverTime}>
                   <defs>
                     <linearGradient id="commissionFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--chart-2)" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0} />
+                      <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="month" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                  <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
                   <Tooltip
-                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }}
+                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }}
                     formatter={(v: number) => formatZAR(v)}
                   />
-                  <Area type="monotone" dataKey="commission" stroke="var(--chart-2)" fill="url(#commissionFill)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="commission" stroke="hsl(var(--chart-2))" fill="url(#commissionFill)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

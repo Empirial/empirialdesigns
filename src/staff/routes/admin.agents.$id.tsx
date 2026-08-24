@@ -336,13 +336,13 @@ function AgentProfile({ agent }: { agent: Agent }) {
                 <div className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={callsPerDay}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis dataKey="day" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                      <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
                       <Tooltip
-                        contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }}
+                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }}
                       />
-                      <Bar dataKey="calls" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="calls" fill="hsl(var(--chart-1))" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -511,13 +511,13 @@ function AgentProfile({ agent }: { agent: Agent }) {
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={revenueByMonth}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis dataKey="month" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                      <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
                       <Tooltip
-                        contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }}
+                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }}
                       />
-                      <Line type="monotone" dataKey="revenue" stroke="var(--chart-2)" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="revenue" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -527,22 +527,23 @@ function AgentProfile({ agent }: { agent: Agent }) {
               {lostReasons.length === 0 ? (
                 <EmptyState compact icon={Handshake} title="Not enough data yet" />
               ) : (
-                <div className="h-[220px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="overflow-y-auto" style={{ height: 220 }}>
+                  <ResponsiveContainer width="100%" height={Math.max(220, lostReasons.length * 32)}>
                     <BarChart data={lostReasons} layout="vertical" margin={{ left: 24 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis type="number" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
                       <YAxis
                         type="category"
                         dataKey="reason"
                         width={140}
-                        tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
-                        stroke="var(--border)"
+                        interval={0}
+                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                        stroke="hsl(var(--border))"
                       />
                       <Tooltip
-                        contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }}
+                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }}
                       />
-                      <Bar dataKey="count" fill="var(--chart-3)" radius={[0, 6, 6, 0]} />
+                      <Bar dataKey="count" fill="hsl(var(--chart-3))" radius={[0, 6, 6, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

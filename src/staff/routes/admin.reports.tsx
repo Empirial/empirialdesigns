@@ -78,7 +78,7 @@ const RANGE_OPTIONS = [
   { value: "custom", label: "Custom" },
 ];
 
-const PIE_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+const PIE_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 
 // A callLog is only written once an agent submits a call outcome (see
 // functions/src/callable/logCall.ts), so every row already represents an
@@ -382,12 +382,12 @@ function PageAdminReports() {
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={revenueOverTime}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="month" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" tickFormatter={(v) => formatZAR(v, { compact: true })} />
-                    <Tooltip formatter={(v: number) => formatZAR(v)} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }} />
-                    <Area type="monotone" dataKey="revenue" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.18} strokeWidth={2} />
-                    <Area type="monotone" dataKey="commission" stroke="var(--chart-3)" fill="var(--chart-3)" fillOpacity={0.18} strokeWidth={2} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" tickFormatter={(v) => formatZAR(v, { compact: true })} />
+                    <Tooltip formatter={(v: number) => formatZAR(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }} />
+                    <Area type="monotone" dataKey="revenue" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1))" fillOpacity={0.18} strokeWidth={2} />
+                    <Area type="monotone" dataKey="commission" stroke="hsl(var(--chart-3))" fill="hsl(var(--chart-3))" fillOpacity={0.18} strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -396,12 +396,12 @@ function PageAdminReports() {
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={callsPerDay}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="day" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }} />
-                    <Bar dataKey="calls" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="connected" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }} />
+                    <Bar dataKey="calls" fill="hsl(var(--chart-2))" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="connected" fill="hsl(var(--chart-1))" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -434,25 +434,25 @@ function PageAdminReports() {
               <div className="h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={callsPerDay}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="day" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }} />
-                    <Bar dataKey="calls" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="connected" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }} />
+                    <Bar dataKey="calls" fill="hsl(var(--chart-2))" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="connected" fill="hsl(var(--chart-1))" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </SectionCard>
             <SectionCard title="Calls Per Agent">
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="overflow-y-auto" style={{ height: 280 }}>
+                <ResponsiveContainer width="100%" height={Math.max(280, callsPerAgent.length * 32)}>
                   <BarChart data={callsPerAgent} layout="vertical" margin={{ left: 16 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                    <XAxis type="number" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <YAxis type="category" dataKey="name" width={90} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }} />
-                    <Bar dataKey="calls" fill="var(--chart-3)" radius={[0, 6, 6, 0]} barSize={16} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                    <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <YAxis type="category" dataKey="name" width={90} interval={0} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }} />
+                    <Bar dataKey="calls" fill="hsl(var(--chart-3))" radius={[0, 6, 6, 0]} barSize={16} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -461,11 +461,11 @@ function PageAdminReports() {
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={contactedOverTime}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="day" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }} />
-                    <Line type="monotone" dataKey="contacted" stroke="var(--chart-1)" strokeWidth={2} dot={{ r: 3 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }} />
+                    <Line type="monotone" dataKey="contacted" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -502,14 +502,14 @@ function PageAdminReports() {
               </div>
             </SectionCard>
             <SectionCard title="Lost Lead Reasons" description="Why deals fall through">
-              <div className="h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="overflow-y-auto" style={{ height: 240 }}>
+                <ResponsiveContainer width="100%" height={Math.max(240, lostReasons.length * 32)}>
                   <BarChart data={lostReasons} layout="vertical" margin={{ left: 40 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                    <XAxis type="number" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <YAxis type="category" dataKey="reason" width={150} tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }} />
-                    <Bar dataKey="count" fill="var(--chart-5)" radius={[0, 6, 6, 0]} barSize={16} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                    <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <YAxis type="category" dataKey="reason" width={150} interval={0} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }} />
+                    <Bar dataKey="count" fill="hsl(var(--chart-5))" radius={[0, 6, 6, 0]} barSize={16} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -522,11 +522,11 @@ function PageAdminReports() {
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={revenueOverTime}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="month" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" tickFormatter={(v) => formatZAR(v, { compact: true })} />
-                    <Tooltip formatter={(v: number) => formatZAR(v)} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }} />
-                    <Area type="monotone" dataKey="revenue" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.18} strokeWidth={2} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" tickFormatter={(v) => formatZAR(v, { compact: true })} />
+                    <Tooltip formatter={(v: number) => formatZAR(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }} />
+                    <Area type="monotone" dataKey="revenue" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1))" fillOpacity={0.18} strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -535,11 +535,11 @@ function PageAdminReports() {
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={revenuePerAgent}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="name" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" />
-                    <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} stroke="var(--border)" tickFormatter={(v) => formatZAR(v, { compact: true })} />
-                    <Tooltip formatter={(v: number) => formatZAR(v)} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }} />
-                    <Bar dataKey="revenue" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} stroke="hsl(var(--border))" tickFormatter={(v) => formatZAR(v, { compact: true })} />
+                    <Tooltip formatter={(v: number) => formatZAR(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }} />
+                    <Bar dataKey="revenue" fill="hsl(var(--chart-1))" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -553,7 +553,7 @@ function PageAdminReports() {
                         <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: number) => formatZAR(v)} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "12px", fontSize: "12px" }} />
+                    <Tooltip formatter={(v: number) => formatZAR(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
