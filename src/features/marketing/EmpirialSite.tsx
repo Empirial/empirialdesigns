@@ -85,10 +85,14 @@ export const SiteNavigation = () => {
 };
 
 export const SiteFooter = () => <footer className="border-t border-white/10 bg-[#050508] px-6 py-14">
-  <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-[1.5fr_1fr_1fr_1.2fr]">
+  <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-[1.3fr_.8fr_.8fr_.9fr_1.1fr]">
     <div><Logo /><p className="mt-5 max-w-xs text-sm leading-6 text-white/45">Intelligent digital solutions that move ambitious businesses forward.</p></div>
     <div><p className="mb-4 text-xs uppercase tracking-[.2em] text-white/40">Explore</p><div className="grid gap-3 text-sm text-white/65"><Link to="/services">Services</Link><Link to="/portfolio">Portfolio</Link><Link to="/about">About</Link><Link to="/contact">Contact</Link></div></div>
     <div><p className="mb-4 text-xs uppercase tracking-[.2em] text-white/40">Capabilities</p><div className="grid gap-3 text-sm text-white/65"><span>Web & apps</span><span>AI automation</span><span>Brand systems</span><span>Growth</span></div></div>
+    {/* Province SEO landing pages — see src/features/marketing/data/provinces.mjs.
+        These have no other on-site link, so this is what gives Google an
+        internal-link path to them instead of relying on the sitemap alone. */}
+    <div><p className="mb-4 text-xs uppercase tracking-[.2em] text-white/40">We also serve</p><div className="grid gap-3 text-sm text-white/65"><Link to="/web-design-limpopo">Limpopo</Link><Link to="/web-design-mpumalanga">Mpumalanga</Link><Link to="/web-design-gauteng">Gauteng</Link></div></div>
     <div><p className="mb-4 text-xs uppercase tracking-[.2em] text-white/40">Start a conversation</p><p className="text-sm text-white/70">hello@empirialdesigns.com</p><p className="mt-2 text-sm text-white/45">Makhado (Louis Trichardt), Limpopo</p><a href="https://wa.me/27651859143" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#b56cff]">WhatsApp us <ArrowRight className="h-4 w-4" /></a></div>
   </div>
   <div className="mx-auto mt-12 max-w-7xl border-t border-white/10 pt-6 text-xs text-white/35">© 2026 EMPIRIAL. All rights reserved.</div>
@@ -156,7 +160,7 @@ const services = [
   },
 ];
 
-const Process = () => <section className="mx-auto max-w-7xl px-6 py-24"><Eyebrow>Our approach</Eyebrow><div className="grid gap-10 md:grid-cols-[.8fr_1.2fr]"><h2 className="text-4xl font-semibold tracking-tight md:text-5xl">Strategy. Design. Build. <span className={purple}>Scale.</span></h2><div className="grid gap-5 sm:grid-cols-4">{[['01','Discover','We learn your goals, audience, and opportunity.'],['02','Design','We shape the right experience and visual system.'],['03','Build','We create clean, fast, robust digital products.'],['04','Scale','We launch, optimise, and help you grow.']].map(([n,t,d]) => <div key={n} className="border-t border-white/15 pt-4"><span className="text-sm text-[#b56cff]">{n}</span><h3 className="mt-5 font-semibold">{t}</h3><p className="mt-2 text-sm leading-6 text-white/45">{d}</p></div>)}</div></div></section>;
+const Process = () => <section className="mx-auto max-w-7xl px-6 py-24"><Eyebrow>Our approach</Eyebrow><div className="grid gap-10 md:grid-cols-[.8fr_1.2fr]"><h2 className="text-4xl font-semibold tracking-tight md:text-5xl">Strategy. Design. Build. <span className={purple}>Scale.</span></h2><div className="grid gap-5 sm:grid-cols-4">{[['01','Discover','We learn your goals, audience, and opportunity.'],['02','Design','We shape the right experience and visual system.'],['03','Build','We create clean, fast, robust digital products.'],['04','Scale','We launch, optimise, and help you grow.']].map(([n,t,d]) => <div key={n} className="group border-t border-white/15 pt-4 transition duration-300 hover:border-[#b56cff]/60"><span className="text-sm tabular-nums text-[#b56cff]">{n}</span><h3 className="mt-5 font-semibold">{t}</h3><p className="mt-2 text-sm leading-6 text-white/45">{d}</p></div>)}</div></div></section>;
 
 const ServiceCard = ({
   service,
@@ -166,29 +170,30 @@ const ServiceCard = ({
   index: number;
 }) => {
   const Icon = service.icon;
+  const recurring = service.cadence === 'Monthly';
   return (
-    <div className="grid gap-6 rounded-2xl border border-white/10 bg-white/[.03] p-7 md:grid-cols-[80px_1fr_auto] md:items-start">
-      <div className="grid h-14 w-14 place-items-center rounded-xl bg-[#7c2cff]/15 text-[#b56cff]">
+    <div className="group relative grid gap-6 rounded-2xl border border-white/10 bg-white/[.03] p-7 transition duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[.05] hover:shadow-[0_20px_55px_-28px_rgba(129,56,255,.55)] md:grid-cols-[80px_1fr_auto] md:items-start">
+      <div className="grid h-14 w-14 place-items-center rounded-xl bg-[#7c2cff]/15 text-[#b56cff] transition duration-300 group-hover:bg-[#7c2cff]/25">
         <Icon />
       </div>
       <div>
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-xs text-[#b56cff]">0{index + 1}</p>
+          <p className="text-xs tabular-nums text-[#b56cff]">0{index + 1}</p>
           <h2 className="text-2xl font-semibold">{service.title}</h2>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-white/45">{service.cadence}</span>
+          <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide ${recurring ? 'border-[#8138ff]/40 bg-[#8138ff]/15 text-[#c9a3ff]' : 'border-white/10 bg-white/5 text-white/45'}`}>{service.cadence}</span>
         </div>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-white/50">{service.text}</p>
         {service.features.length > 0 ? (
           <ul className="mt-4 flex flex-wrap gap-2">
             {service.features.map((f) => (
-              <li key={f} className="rounded-lg border border-white/10 bg-white/[.02] px-3 py-1.5 text-xs text-white/60">{f}</li>
+              <li key={f} className="rounded-lg border border-white/10 bg-white/[.02] px-3 py-1.5 text-xs text-white/60 transition duration-200 hover:border-white/20 hover:bg-white/[.06] hover:text-white/80">{f}</li>
             ))}
           </ul>
         ) : null}
         {service.tiers ? (
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
             {service.tiers.map((tier) => (
-              <div key={tier.name} className="rounded-lg border border-white/10 bg-white/[.02] px-3 py-2.5">
+              <div key={tier.name} className="rounded-lg border border-white/10 bg-white/[.02] px-3 py-2.5 transition duration-200 hover:border-[#8138ff]/40 hover:bg-white/[.04]">
                 <p className="text-xs font-semibold text-white">{tier.name}</p>
                 <p className="mt-0.5 text-xs text-white/45">{tier.blurb}</p>
               </div>
@@ -196,14 +201,85 @@ const ServiceCard = ({
           </div>
         ) : null}
       </div>
-      <Link to="/contact" className="text-sm font-semibold text-white/70 hover:text-white md:self-center">
-        Discuss this <ArrowRight className="ml-1 inline h-4 w-4" />
+      <Link
+        to="/contact"
+        className="inline-flex items-center gap-1.5 rounded-md text-sm font-semibold text-white/70 transition duration-200 hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8138ff]/60 md:self-center"
+      >
+        Discuss this <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
       </Link>
     </div>
   );
 };
 
-export const ServicesPage = () => <Page><section className="px-6 pb-20 pt-36"><div className="mx-auto max-w-7xl"><Eyebrow>Capabilities</Eyebrow><h1 className="max-w-4xl text-5xl font-semibold tracking-tight sm:text-7xl">Digital solutions built for <span className={purple}>ambitious businesses.</span></h1><p className="mt-7 max-w-2xl text-lg leading-8 text-white/55">From your first landing page to the systems that run your growth, EMPIRIAL brings strategy, design, and technology together.</p></div></section><section className="mx-auto max-w-7xl px-6 pb-24"><div className="grid gap-4">{services.map((service, i) => <ServiceCard key={service.title} service={service} index={i} />)}</div></section><Process /></Page>;
+const ServiceGroup = ({
+  label,
+  blurb,
+  items,
+  startIndex,
+}: {
+  label: string;
+  blurb: string;
+  items: typeof services;
+  startIndex: number;
+}) => (
+  <div className="mb-14 last:mb-0">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-4">
+      <h2 className="text-sm font-semibold uppercase tracking-[.2em] text-white/50">{label}</h2>
+      <p className="text-sm text-white/40">{blurb}</p>
+    </div>
+    <div className="grid gap-4 xl:grid-cols-2">
+      {items.map((service, i) => <ServiceCard key={service.title} service={service} index={startIndex + i} />)}
+    </div>
+  </div>
+);
+
+const ServicesCta = () => (
+  <section className="mx-auto max-w-7xl px-6 pb-28">
+    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[.03] px-8 py-14 text-center sm:px-16">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_0%,rgba(129,56,255,.22),transparent_55%)]" />
+      <Eyebrow>Next step</Eyebrow>
+      <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">Tell us which service fits, and we'll shape the rest with you.</h2>
+      <p className="mx-auto mt-4 max-w-xl text-white/55">A short call or message is usually enough to work out scope, timeline, and price.</p>
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+        <Link
+          to="/contact"
+          className="inline-flex items-center gap-2 rounded-lg bg-[#8138ff] px-6 py-3 text-sm font-semibold text-white shadow-[0_0_24px_rgba(129,56,255,.35)] transition duration-200 hover:bg-[#9858ff] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8138ff]/60"
+        >
+          Start a conversation <ArrowRight className="h-4 w-4" />
+        </Link>
+        <a
+          href="https://wa.me/27651859143"
+          className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-6 py-3 text-sm font-semibold text-white/80 transition duration-200 hover:border-white/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+        >
+          WhatsApp us
+        </a>
+      </div>
+    </div>
+  </section>
+);
+
+export const ServicesPage = () => {
+  const onceOff = services.filter((s) => s.cadence.startsWith('Once-off'));
+  const ongoing = services.filter((s) => s.cadence === 'Monthly');
+  return (
+    <Page>
+      <section className="relative overflow-hidden px-6 pb-20 pt-36">
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_20%,rgba(102,32,204,.28),transparent_40%),linear-gradient(180deg,#090811_0%,#050508_85%)]" />
+        <div className="mx-auto max-w-7xl">
+          <Eyebrow>Capabilities</Eyebrow>
+          <h1 className="max-w-4xl text-5xl font-semibold tracking-tight sm:text-7xl">Digital solutions built for <span className={purple}>ambitious businesses.</span></h1>
+          <p className="mt-7 max-w-2xl text-lg leading-8 text-white/55">From your first landing page to the systems that run your growth, EMPIRIAL brings strategy, design, and technology together.</p>
+        </div>
+      </section>
+      <section className="mx-auto max-w-7xl px-6 pb-24">
+        <ServiceGroup label="Built once" blurb="A fixed-scope project, delivered and handed over." items={onceOff} startIndex={0} />
+        <ServiceGroup label="Ongoing" blurb="Work that keeps running — and improving — every month." items={ongoing} startIndex={onceOff.length} />
+      </section>
+      <Process />
+      <ServicesCta />
+    </Page>
+  );
+};
 
 const projects = [
   { title: 'Smite Trade', category: 'Websites', type: 'Trading platform · Website · Product design', image: smiteTradeHero, url: 'https://smitetrade.co.za' },
