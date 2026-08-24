@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, Timestamp } from "firebase/firestore";
 import { toast } from "sonner";
@@ -38,6 +38,7 @@ import {
 import { db } from "@staff/lib/firebase";
 import { useLeads } from "@staff/lib/leads";
 import { useAgents } from "@staff/lib/agents-data";
+import { LeadQuickPreviewDialog, type QuickPreviewLead } from "@staff/components/shared/lead-quick-preview";
 import { useDeals } from "@staff/lib/deals-data";
 import { useServices } from "@staff/lib/services-data";
 import { formatDate, formatZAR, percent } from "@staff/lib/format";
@@ -628,6 +629,24 @@ function LeadListTable({
   dateColumn: string;
   followUpDates?: boolean;
 }) {
+  const [previewLead, setPreviewLead] = useState<QuickPreviewLead | null>(null);
+
+  const openPreview = (lead: Lead) => {
+    setPreviewLead({
+      id: lead.id,
+      business: lead.business,
+      contactPerson: lead.contactPerson,
+      phone: lead.phone,
+      email: lead.email,
+      agentName: lead.assignedAgentId ? agentNameById.get(lead.assignedAgentId) ?? "Unknown agent" : "Unassigned",
+      industry: lead.industry,
+      status: lead.status,
+      value: lead.value,
+      lastContact: lead.lastContact,
+      nextFollowUp: lead.nextFollowUp,
+    });
+  };
+
   return (
     <SectionCard title={title} description={`${description} ${leads.length} total.`} noPadding>
       <div className="overflow-x-auto">
@@ -646,9 +665,9 @@ function LeadListTable({
             {leads.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">No leads in this list.</TableCell></TableRow>
             ) : leads.map((lead) => (
-              <TableRow key={lead.id}>
+              <TableRow key={lead.id} className="cursor-pointer" onClick={() => openPreview(lead)}>
                 <TableCell>
-                  <Link to="/admin/leads" search={{ leadId: lead.id }} className="font-medium hover:underline">{lead.business}</Link>
+                  <p className="font-medium hover:underline">{lead.business}</p>
                   <p className="text-xs text-muted-foreground">{lead.contactPerson || "No contact listed"}</p>
                 </TableCell>
                 <TableCell className="text-sm">{lead.assignedAgentId ? agentNameById.get(lead.assignedAgentId) ?? "Unknown agent" : "Unassigned"}</TableCell>
@@ -661,6 +680,7 @@ function LeadListTable({
           </TableBody>
         </Table>
       </div>
+      <LeadQuickPreviewDialog lead={previewLead} open={!!previewLead} onOpenChange={(o) => !o && setPreviewLead(null)} />
     </SectionCard>
   );
 }

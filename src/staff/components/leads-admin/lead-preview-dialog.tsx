@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Mail, Phone, Pencil, UserPlus } from "lucide-react";
+import { Mail, MessageCircle, Phone, Pencil, UserPlus } from "lucide-react";
 import { AvatarChip, UnassignedChip } from "@staff/components/shared/avatar-chip";
 import { StatusBadge } from "@staff/components/shared/status-badge";
 import { ActivityTimeline } from "@staff/components/shared/activity-timeline";
@@ -19,6 +19,7 @@ import {
 import { addLeadNote, invalidateLeadQueries, useLeadActivities, useLeadNotes } from "@staff/lib/leads";
 import { firebaseAuth } from "@staff/lib/auth";
 import { formatDate, formatDateTime, formatZAR } from "@staff/lib/format";
+import { toWhatsAppLink } from "@staff/lib/phone";
 import type { Agent, Lead, Service } from "@staff/lib/types";
 
 /**
@@ -84,9 +85,19 @@ export function LeadPreviewDialog({
         <div className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border border-border bg-muted/30 p-4 text-sm sm:grid-cols-2">
           <DetailRow label="Phone">
             {lead.phone ? (
-              <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1.5 text-primary hover:underline">
-                <Phone className="size-3.5" /> {lead.phone}
-              </a>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1.5 text-primary hover:underline">
+                  <Phone className="size-3.5" /> {lead.phone}
+                </a>
+                <a
+                  href={toWhatsAppLink(lead.phone)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[#25D366] hover:underline"
+                >
+                  <MessageCircle className="size-3.5" /> WhatsApp
+                </a>
+              </div>
             ) : (
               "—"
             )}

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { CalendarDays, Phone, PhoneCall, Target, Users } from "lucide-react";
@@ -10,6 +11,7 @@ import { EmptyState } from "@staff/components/shared/empty-state";
 import { SectionCard } from "@staff/components/shared/section-card";
 import { KpiCard, KpiGrid } from "@staff/components/shared/kpi-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@staff/components/ui/table";
+import { LeadQuickPreviewDialog, type QuickPreviewLead } from "@staff/components/shared/lead-quick-preview";
 import { callGetMyTeam } from "@staff/lib/functions";
 import { formatDate } from "@staff/lib/format";
 
@@ -28,6 +30,7 @@ function PageAgentTeam() {
   const followUpLeads = data?.followUpLeads ?? [];
   const callsThisWeek = team.reduce((total, agent) => total + agent.callsThisWeek, 0);
   const callsLeft = team.reduce((total, agent) => total + agent.callsLeft, 0);
+  const [previewLead, setPreviewLead] = useState<QuickPreviewLead | null>(null);
 
   return (
     <AppShell>
@@ -80,12 +83,13 @@ function PageAgentTeam() {
             </div>
           </SectionCard>
           <div className="grid gap-6 xl:grid-cols-2">
-            <TeamContactTable title="Interested leads" description="Contacts currently interested in your team's services." leads={interestedLeads} dateLabel="Last contact" />
-            <TeamContactTable title="Follow-up contacts" description="Contacts your team needs to follow up with." leads={followUpLeads} dateLabel="Follow-up due" followUpDates />
+            <TeamContactTable title="Interested leads" description="Contacts currently interested in your team's services." leads={interestedLeads} dateLabel="Last contact" onSelect={setPreviewLead} />
+            <TeamContactTable title="Follow-up contacts" description="Contacts your team needs to follow up with." leads={followUpLeads} dateLabel="Follow-up due" followUpDates onSelect={setPreviewLead} />
           </div>
           </div>
         ) : null}
       </div>
+      <LeadQuickPreviewDialog lead={previewLead} open={!!previewLead} onOpenChange={(o) => !o && setPreviewLead(null)} />
     </AppShell>
   );
 }
@@ -96,12 +100,14 @@ function TeamContactTable({
   leads,
   dateLabel,
   followUpDates = false,
+  onSelect,
 }: {
   title: string;
   description: string;
   leads: { id: string; business: string; contactPerson: string; phone: string; email: string; agentName: string; nextFollowUp: string | null; lastContact: string | null }[];
   dateLabel: string;
   followUpDates?: boolean;
+  onSelect: (lead: QuickPreviewLead) => void;
 }) {
   return (
     <SectionCard title={title} description={`${description} ${leads.length} total.`} noPadding>
@@ -110,7 +116,22 @@ function TeamContactTable({
           <TableHeader><TableRow><TableHead>Contact</TableHead><TableHead>Agent</TableHead><TableHead>{dateLabel}</TableHead></TableRow></TableHeader>
           <TableBody>
             {leads.length === 0 ? <TableRow><TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">No contacts in this list.</TableCell></TableRow> : leads.map((lead) => (
-              <TableRow key={lead.id}>
+              <TableRow
+                key={lead.id}
+                className="cursor-pointer"
+                onClick={() =>
+                  onSelect({
+                    id: lead.id,
+                    business: lead.business,
+                    contactPerson: lead.contactPerson,
+                    phone: lead.phone,
+                    email: lead.email,
+                    agentName: lead.agentName,
+                    lastContact: lead.lastContact,
+                    nextFollowUp: lead.nextFollowUp,
+                  })
+                }
+              >
                 <TableCell><p className="font-medium">{lead.business}</p><p className="text-xs text-muted-foreground">{lead.contactPerson || lead.phone || lead.email || "No contact details"}</p></TableCell>
                 <TableCell className="text-sm">{lead.agentName}</TableCell>
                 <TableCell className="text-sm">{formatDate((followUpDates ? lead.nextFollowUp : lead.lastContact) ?? "")}</TableCell>
